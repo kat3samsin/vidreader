@@ -1,0 +1,20 @@
+(function () {
+  var root = document.documentElement;
+  var stored = localStorage.getItem('watchpaper-theme');
+  root.dataset.theme = stored || (matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'paper');
+  root.dataset.readerFont = localStorage.getItem('watchpaper-reader-font') || 'serif';
+  root.dataset.readerAlign = localStorage.getItem('watchpaper-reader-align') === 'justify' ? 'justify' : 'left';
+  var readerWidths = ['48', '58', '68', '78', '88', 'full'];
+  var readerWidth = localStorage.getItem('watchpaper-reader-width') || 'full';
+  if (!readerWidths.includes(readerWidth)) readerWidth = 'full';
+  root.dataset.readerWidth = readerWidth;
+  root.style.setProperty('--reader-width', readerWidth === 'full' ? 'none' : readerWidth + 'ch');
+  var storedSize = localStorage.getItem('watchpaper-reader-size') || '17';
+  var legacySizes = { small: 16, medium: 17, large: 19, xlarge: 22, huge: 26 };
+  var readerSize = legacySizes[storedSize] || Number(storedSize);
+  if (!Number.isFinite(readerSize) || readerSize < 14 || readerSize > 36) readerSize = 17;
+  readerSize = Math.round(readerSize);
+  root.dataset.readerSize = String(readerSize);
+  root.style.setProperty('--reader-size', readerSize + 'px');
+  localStorage.setItem('watchpaper-reader-size', String(readerSize));
+})();

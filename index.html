@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>VidReader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400..700;1,400..600&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./reader.css?v=reader-actions-left-20260807-1" />
+    <script src="./preferences-init.js"></script>
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="mast-main">
+        <a class="wordmark" href="/" aria-label="VidReader home"><span class="wordmark-mark" aria-hidden="true">V</span><span>VidReader</span></a>
+        <span class="queue-status" id="queue-status" aria-live="polite">0 in queue · 0 unread</span>
+        <button class="mast-action mast-action-end" id="summary-settings">Settings</button>
+      </div>
+    </header>
+    <main class="app-main">
+      <section class="intake" aria-labelledby="intake-title">
+        <div class="intake-copy">
+          <h1 id="intake-title">Save your time reading.</h1>
+          <p>Paste a YouTube link and read the transcript instead.</p>
+        </div>
+        <form class="link-form" id="video-form">
+          <label for="video-url">Video link</label>
+          <div class="link-row">
+            <input id="video-url" type="url" inputmode="url" autocomplete="url" aria-describedby="video-helper" aria-required="true" placeholder="https://www.youtube.com/watch?v=…" required />
+            <button class="chip chip-primary" id="read-video" type="submit">Read transcript</button>
+          </div>
+          <p class="helper" id="video-helper" data-default="Public YouTube videos with captions work best." aria-live="polite">Public YouTube videos with captions work best.</p>
+        </form>
+      </section>
+      <section class="workspace">
+        <aside class="queue-pane" aria-label="Reading queue">
+          <header class="queue-head">
+            <h2>Reading queue</h2>
+            <button class="chip chip-quiet" id="add-channel">Follow channel</button>
+          </header>
+          <details class="channel-picker" id="channel-picker" open>
+            <summary class="channel-picker-summary">
+              <span class="channel-picker-current">
+                <span>Channel</span>
+                <strong id="channel-picker-value">All channels</strong>
+              </span>
+              <span class="channel-picker-disclose">Choose</span>
+            </summary>
+            <div class="channel-picker-panel">
+              <label class="channel-search" for="channel-search">Channels</label>
+              <input id="channel-search" type="search" autocomplete="off" placeholder="Find channel" />
+              <nav class="rail" id="channel-rail" aria-label="Channels"></nav>
+            </div>
+          </details>
+          <section class="index" aria-label="Video index" tabindex="0">
+          <div class="index-tools">
+            <div class="filters" role="group" aria-label="Filter videos">
+              <button class="filter is-active" data-filter="all">All <span>0</span></button>
+              <button class="filter" data-filter="unread">Unread <span>0</span></button>
+              <button class="filter" data-filter="saved">Saved <span>0</span></button>
+            </div>
+            <label class="search"><span class="visually-hidden">Search titles</span><input id="search" type="search" placeholder="Search queue" /></label>
+          </div>
+          <div id="video-list" class="entries"></div>
+          <p class="channel-line" id="channel-line"></p>
+          </section>
+        </aside>
+        <article class="reader" id="reader" aria-label="Reader" tabindex="0"></article>
+      </section>
+    </main>
+    <dialog id="channel-dialog">
+      <form method="dialog">
+        <button class="close" value="cancel" aria-label="Close">×</button>
+        <h2>Add a channel</h2>
+        <label>Channel URL or @handle<input id="channel-url" aria-describedby="channel-helper" aria-required="true" placeholder="youtube.com/@creator" required /></label>
+        <p class="helper" id="channel-helper" data-default="VidReader reads the channel’s public feed and pulls English captions when they exist.">VidReader reads the channel’s public feed and pulls English captions when they exist.</p>
+        <button class="chip chip-primary submit" value="default">Add channel</button>
+      </form>
+    </dialog>
+    <dialog id="summary-dialog" aria-labelledby="summary-dialog-title" aria-describedby="summary-dialog-description">
+      <form method="dialog">
+        <button class="close" value="cancel" aria-label="Close">×</button>
+        <h2 id="summary-dialog-title">Reading settings</h2>
+        <p class="dialog-intro" id="summary-dialog-description">Applies to distillations and transcripts. Saved in this browser.</p>
+        <fieldset class="pref">
+          <legend>Theme</legend>
+          <div class="segment">
+            <label><input type="radio" name="theme" value="paper" /><span>Paper</span></label>
+            <label><input type="radio" name="theme" value="sepia" /><span>Sepia</span></label>
+            <label><input type="radio" name="theme" value="night" /><span>Night</span></label>
+          </div>
+        </fieldset>
+        <fieldset class="pref">
+          <legend>Reading typeface</legend>
+          <div class="segment">
+            <label><input type="radio" name="font" value="serif" /><span class="face-serif">Serif</span></label>
+            <label><input type="radio" name="font" value="sans" /><span class="face-sans">Sans-serif</span></label>
+            <label><input type="radio" name="font" value="mono" /><span class="face-mono">Mono</span></label>
+          </div>
+        </fieldset>
+        <fieldset class="pref">
+          <legend>Text alignment</legend>
+          <div class="segment">
+            <label><input type="radio" name="alignment" value="left" /><span>Left</span></label>
+            <label><input type="radio" name="alignment" value="justify" /><span>Justified</span></label>
+          </div>
+          <p class="helper">Applies to Distill and Focus.</p>
+        </fieldset>
+        <fieldset class="pref">
+          <legend>Text size</legend>
+          <div class="size-stepper" role="group" aria-label="Text size">
+            <button id="reader-size-down" type="button" aria-label="Decrease text size" aria-describedby="reader-size-value">−</button>
+            <output id="reader-size-value" aria-live="polite">17 px</output>
+            <button id="reader-size-up" type="button" aria-label="Increase text size" aria-describedby="reader-size-value">+</button>
+          </div>
+        </fieldset>
+        <fieldset class="pref">
+          <legend>Column width</legend>
+          <div class="size-stepper" role="group" aria-label="Column width">
+            <button id="reader-width-down" type="button" aria-label="Narrow column" aria-describedby="reader-width-value">−</button>
+            <output id="reader-width-value" aria-live="polite">Full width</output>
+            <button id="reader-width-up" type="button" aria-label="Widen column" aria-describedby="reader-width-value">+</button>
+          </div>
+          <p class="helper">Used when the video is hidden.</p>
+        </fieldset>
+        <p class="helper">Reading preferences apply to the distillation and transcript. Saved in this browser.</p>
+        <h3>AI provider</h3>
+        <label>Provider<select id="summary-provider"><option value="codex">My Codex session</option><option value="claude-session">My Claude session</option><option value="anthropic">Claude API key</option><option value="openai">OpenAI API key</option></select></label>
+        <label>API key<input id="summary-key" type="password" autocomplete="off" placeholder="Not needed for Codex or Claude sessions" /></label>
+        <label>Model<select id="summary-model"></select></label>
+        <label id="custom-model-wrap" hidden>Custom model<input id="custom-summary-model" placeholder="Provider model ID" /></label>
+        <label>Distillation prompt<textarea id="summary-prompt" rows="4" placeholder="e.g. Give me a three-bullet summary and one question to sit with"></textarea></label>
+        <p class="helper">Nothing is sent until you choose an AI action. Focus uses the provider and model, but never this distillation prompt.</p>
+        <button class="chip chip-primary submit" id="save-summary-settings" value="default">Done</button>
+      </form>
+    </dialog>
+    <footer class="foot-dense">
+      <p>VidReader 2026</p>
+    </footer>
+    <div class="toast-region" id="toast-region" aria-live="polite" hidden></div>
+    <script src="./app.js?v=youtube-only-20260914"></script>
+  </body>
+</html>
