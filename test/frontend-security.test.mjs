@@ -105,3 +105,72 @@ test('renders YouTube playback with timestamp seeking and the required referrer 
   context.videoOpen = false;
   assert.equal(context.videoPanelMarkup(), '');
 });
+
+test('keeps API keys with their provider when saving settings and using either AI action', async () => {
+  const localValues = new Map([['watchpaper-summary-provider', 'openai']]);
+  const sessionValues = new Map([['watchpaper-summary-key', 'synthetic-legacy-key']]);
+  const storage = values => ({ getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) });
+  const nodes = new Map();
+  const node = selector => {
+    if (!nodes.has(selector)) nodes.set(selector, { value: '', hidden: false });
+    return nodes.get(selector);
+  };
+  const requests = [];
+  const lines = [{ id: 0, content: 'Synthetic transcript.' }];
+  const context = vm.createContext({
+    document: { querySelector: node }, localStorage: storage(localValues), sessionStorage: storage(sessionValues),
+    summaryDialog: { showModal() {}, querySelector() { return null; } }, syncReadingSettings() {},
+    selected: { id: 'abcdefghijk' }, transcript: lines, focusCleanupVersion: 4, focusCleanupRequest: 0,
+    focusCleanupState: { videoId: null }, focusSourceLines: () => lines, focusFingerprint: () => 'synthetic-fingerprint',
+    renderModeContent() {}, refreshReader() {}, saveDistillation() {}, saveFocusCleanup() {},
+    fetch: async (url, options) => {
+      requests.push({ url, ...JSON.parse(options.body) });
+      return { ok: true, json: async () => ({ summary: 'Synthetic summary.', lines, cleanupVersion: 4 }) };
+    },
+  });
+  vm.runInContext(app.slice(app.indexOf('const summaryModels ='), app.indexOf('const videoForm =')), context);
+  const save = () => node('#save-summary-settings').onclick();
+  const choose = provider => {
+    node('#summary-provider').value = provider;
+    node('#summary-provider').onchange({ target: node('#summary-provider') });
+  };
+  const useBothActions = async () => {
+    await context.summarizeVideo();
+    await context.cleanFocusTranscript();
+  };
+
+  context.openSummarySettings();
+  assert.equal(node('#summary-key').value, '');
+  await useBothActions();
+  assert.equal(requests.length, 0, 'an old key without a recorded owner is never sent');
+
+  node('#summary-key').value = 'synthetic-openai-key';
+  save();
+  await useBothActions();
+  assert.deepEqual(requests.map(({ provider, apiKey }) => ({ provider, apiKey })), [
+    { provider: 'openai', apiKey: 'synthetic-openai-key' },
+    { provider: 'openai', apiKey: 'synthetic-openai-key' },
+  ]);
+
+  choose('anthropic');
+  assert.equal(node('#summary-key').value, '');
+  save();
+  await useBothActions();
+  assert.equal(requests.length, 2, 'switching providers cannot reuse the previous provider key');
+
+  node('#summary-key').value = 'synthetic-anthropic-key';
+  save();
+  await useBothActions();
+  assert.deepEqual(requests.slice(2).map(({ provider, apiKey }) => ({ provider, apiKey })), [
+    { provider: 'anthropic', apiKey: 'synthetic-anthropic-key' },
+    { provider: 'anthropic', apiKey: 'synthetic-anthropic-key' },
+  ]);
+  choose('openai');
+  assert.equal(node('#summary-key').value, 'synthetic-openai-key');
+  choose('codex');
+  assert.equal(node('#summary-key').value, '');
+  save();
+  await useBothActions();
+  assert.ok(requests.slice(4).every(({ provider, apiKey }) => provider === 'codex' && apiKey === ''));
+  assert.ok([...localValues.values()].every(value => !value.includes('synthetic-')), 'keys stay out of localStorage');
+});

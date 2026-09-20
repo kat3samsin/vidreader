@@ -12,7 +12,7 @@ const files = [
   'focus-cleanup.mjs', 'vtt.mjs', 'app.js', 'preferences-init.js',
   'index.html', 'reader.css', 'tokens.css',
   'test/focus-cleanup.test.mjs',
-  'test/server-static.test.mjs', 'test/youtube-transcript.test.mjs',
+  'test/server-static.test.mjs', 'test/youtube-transcript.test.mjs', 'test/vtt.test.mjs',
   'test/frontend-security.test.mjs', 'test/server-security.test.mjs',
   'scripts/export-public.mjs',
 ];

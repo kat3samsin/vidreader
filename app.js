@@ -733,11 +733,16 @@ function renderModelOptions(provider, selectedModel = '') {
   document.querySelector('#custom-summary-model').value = known ? '' : selectedModel;
   document.querySelector('#custom-model-wrap').hidden = document.querySelector('#summary-model').value !== 'custom';
 }
+function storedApiKey(provider) {
+  return ['openai', 'anthropic'].includes(provider)
+    ? sessionStorage.getItem(`watchpaper-summary-key-${provider}`) || ''
+    : '';
+}
 function openSummarySettings() {
   syncReadingSettings();
   const provider = localStorage.getItem('watchpaper-summary-provider') || 'codex';
   document.querySelector('#summary-provider').value = provider;
-  document.querySelector('#summary-key').value = sessionStorage.getItem('watchpaper-summary-key') || '';
+  document.querySelector('#summary-key').value = storedApiKey(provider);
   document.querySelector('#summary-prompt').value = localStorage.getItem('watchpaper-summary-prompt') || '';
   renderModelOptions(provider, localStorage.getItem('watchpaper-summary-model') || '');
   summaryDialog.showModal();
@@ -746,17 +751,23 @@ function openSummarySettings() {
 }
 document.querySelector('#summary-settings').onclick = openSummarySettings;
 document.querySelector('#save-summary-settings').onclick = () => {
-  localStorage.setItem('watchpaper-summary-provider', document.querySelector('#summary-provider').value);
+  const provider = document.querySelector('#summary-provider').value;
+  localStorage.setItem('watchpaper-summary-provider', provider);
   const model = document.querySelector('#summary-model').value === 'custom' ? document.querySelector('#custom-summary-model').value.trim() : document.querySelector('#summary-model').value;
   localStorage.setItem('watchpaper-summary-model', model);
   localStorage.setItem('watchpaper-summary-prompt', document.querySelector('#summary-prompt').value.trim());
-  sessionStorage.setItem('watchpaper-summary-key', document.querySelector('#summary-key').value.trim());
+  if (['openai', 'anthropic'].includes(provider)) {
+    sessionStorage.setItem(`watchpaper-summary-key-${provider}`, document.querySelector('#summary-key').value.trim());
+  }
 };
-document.querySelector('#summary-provider').onchange = event => renderModelOptions(event.target.value);
+document.querySelector('#summary-provider').onchange = event => {
+  renderModelOptions(event.target.value);
+  document.querySelector('#summary-key').value = storedApiKey(event.target.value);
+};
 document.querySelector('#summary-model').onchange = event => { document.querySelector('#custom-model-wrap').hidden = event.target.value !== 'custom'; };
 async function summarizeVideo() {
   const provider = localStorage.getItem('watchpaper-summary-provider') || 'codex';
-  const apiKey = sessionStorage.getItem('watchpaper-summary-key');
+  const apiKey = storedApiKey(provider);
   if (!provider || !['codex', 'claude-session'].includes(provider) && !apiKey) return openSummarySettings();
   if (!transcript.length) return;
   const video = selected;
@@ -785,7 +796,7 @@ async function summarizeVideo() {
 
 async function cleanFocusTranscript() {
   const provider = localStorage.getItem('watchpaper-summary-provider') || 'codex';
-  const apiKey = sessionStorage.getItem('watchpaper-summary-key');
+  const apiKey = storedApiKey(provider);
   if (!provider || !['codex', 'claude-session'].includes(provider) && !apiKey) return openSummarySettings();
   const sourceLines = focusSourceLines();
   if (!selected || !sourceLines.length) return;

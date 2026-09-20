@@ -13,8 +13,8 @@ async function readerFor(t) {
   t.after(() => new Promise(resolve => server.close(resolve)));
   const { port } = server.address();
   const origin = `http://127.0.0.1:${port}`;
-  const send = (path, { method = 'GET', headers = {}, body } = {}) => new Promise((resolve, reject) => {
-    const req = request({ hostname: '127.0.0.1', port, path, method, headers }, res => {
+  const send = (path, { method = 'GET', headers = {}, body, signal } = {}) => new Promise((resolve, reject) => {
+    const req = request({ hostname: '127.0.0.1', port, path, method, headers, signal }, res => {
       let body = '';
       res.setEncoding('utf8');
       res.on('data', chunk => { body += chunk; });
@@ -185,4 +185,96 @@ test('rejects malformed request URLs without terminating the server', async t =>
   const { send } = await readerFor(t);
   assert.equal((await send('http://[')).status, 400);
   assert.equal((await send('/')).status, 200);
+});
+
+test('disconnecting cleanup cancels its provider request and releases API capacity', { timeout: 5000 }, async t => {
+  let notifyProvider;
+  const providerStarted = new Promise(resolve => { notifyProvider = resolve; });
+  let notifyAbort;
+  const providerAborted = new Promise(resolve => { notifyAbort = resolve; });
+  let notifyVideos;
+  const videosStarted = new Promise(resolve => { notifyVideos = resolve; });
+  let releaseVideos;
+  const videoGate = new Promise(resolve => { releaseVideos = resolve; });
+  let releaseProvider;
+  const cancellation = new AbortController();
+  t.after(() => { cancellation.abort(); releaseVideos(); releaseProvider?.(); });
+  const { send, origin } = await readerFor(t);
+  let providerCalls = 0;
+  let videoCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (input, options) => {
+    if (String(input).startsWith('https://api.openai.com/')) {
+      providerCalls++;
+      notifyProvider();
+      return new Promise((resolve, reject) => {
+        releaseProvider = () => reject(new Error('Test cleanup.'));
+        options.signal.addEventListener('abort', () => { notifyAbort(); reject(options.signal.reason); }, { once: true });
+      });
+    }
+    videoCalls++;
+    if (videoCalls === 3) notifyVideos();
+    if (videoCalls <= 3) await videoGate;
+    return Response.json({ title: 'Example video', author_name: 'Example channel' });
+  });
+  const body = JSON.stringify({
+    provider: 'openai', apiKey: 'synthetic-audit-key',
+    lines: Array.from({ length: 4 }, (_, id) => ({ id, content: 'word '.repeat(1000).trim() })),
+  });
+  const cleanup = send('/api/focus-cleanup', {
+    method: 'POST', headers: { origin, 'content-type': 'application/json' }, body, signal: cancellation.signal,
+  });
+  const disconnected = assert.rejects(cleanup, { name: 'AbortError' });
+  await providerStarted;
+  const pendingVideos = Array.from({ length: 3 }, () => send('/api/video?source=abcdefghijk'));
+  await videosStarted;
+  assert.equal((await send('/api/video?source=abcdefghijk')).status, 429);
+  cancellation.abort();
+  await disconnected;
+  await providerAborted;
+  assert.equal((await send('/api/video?source=abcdefghijk')).status, 200);
+  assert.equal(providerCalls, 1);
+  releaseVideos();
+  assert.deepEqual((await Promise.all(pendingVideos)).map(response => response.status), [200, 200, 200]);
+});
+
+test('a completed provider response cannot start another chunk or retry after disconnect', { timeout: 5000 }, async t => {
+  const pending = [];
+  t.after(() => { for (const finish of pending) finish(); });
+  const { send, origin } = await readerFor(t);
+  for (const validResponse of [true, false]) {
+    let started;
+    const providerStarted = new Promise(resolve => { started = resolve; });
+    let aborted;
+    const providerAborted = new Promise(resolve => { aborted = resolve; });
+    let providerCalls = 0;
+    const mock = t.mock.method(globalThis, 'fetch', async (_input, options) => {
+      providerCalls++;
+      const { lines } = JSON.parse(JSON.parse(options.body).input);
+      started();
+      if (providerCalls === 1) await new Promise(resolve => {
+        pending.push(resolve);
+        options.signal.addEventListener('abort', () => { aborted(); resolve(); }, { once: true });
+      });
+      return Response.json({ output_text: validResponse
+        ? JSON.stringify({ lines: lines.map(line => ({ id: line.id, text: line.content, paragraphStart: true })) })
+        : 'Invalid response',
+      });
+    });
+    const cancellation = new AbortController();
+    const cleanup = send('/api/focus-cleanup', {
+      method: 'POST', headers: { origin, 'content-type': 'application/json' }, signal: cancellation.signal,
+      body: JSON.stringify({ provider: 'openai', apiKey: 'synthetic-audit-key', lines: [
+        { id: 0, content: 'word '.repeat(1000).trim() },
+        { id: 1, content: 'next '.repeat(1000).trim() },
+      ] }),
+    });
+    const disconnected = assert.rejects(cleanup, { name: 'AbortError' });
+    await providerStarted;
+    cancellation.abort();
+    await disconnected;
+    await providerAborted;
+    assert.equal((await send('/')).status, 200);
+    assert.equal(providerCalls, 1);
+    mock.mock.restore();
+  }
 });
