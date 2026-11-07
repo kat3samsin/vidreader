@@ -9,5 +9,9 @@
     "start": "node --env-file-if-exists=.env.local server.mjs",
     "test": "node --test test/*.test.mjs",
     "export:public": "node scripts/export-public.mjs"
+  },
+  "dependencies": {
+    "@napi-rs/keyring": "2.1.2",
+    "@siwc/local": "file:vendor/siwc-local-0.1.0.tgz"
   }
 }

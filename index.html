@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400..700;1,400..600&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./reader.css?v=reader-actions-left-20260807-1" />
+    <link rel="stylesheet" href="./reader.css?v=reading-first-20261107-2" />
     <script src="./preferences-init.js"></script>
   </head>
   <body>
@@ -15,7 +15,12 @@
       <div class="mast-main">
         <a class="wordmark" href="/" aria-label="VidReader home"><span class="wordmark-mark" aria-hidden="true">V</span><span>VidReader</span></a>
         <span class="queue-status" id="queue-status" aria-live="polite">0 in queue · 0 unread</span>
-        <button class="mast-action mast-action-end" id="summary-settings">Settings</button>
+        <button class="mast-action mast-action-end settings-icon" id="summary-settings" aria-label="Settings" title="Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M9.5 3h5l.7 2.5 2 .9 2.3-.7 2.5 4.3-1.8 1.8v2.4l1.8 1.8-2.5 4.3-2.3-.7-2 .9-.7 2.5h-5l-.7-2.5-2-.9-2.3.7L2 15.8 3.8 14v-2.4L2 9.8l2.5-4.3 2.3.7 2-.9z" />
+            <circle cx="12" cy="12.8" r="3" />
+          </svg>
+        </button>
       </div>
     </header>
     <main class="app-main">
@@ -28,18 +33,21 @@
           <label for="video-url">Video link</label>
           <div class="link-row">
             <input id="video-url" type="url" inputmode="url" autocomplete="url" aria-describedby="video-helper" aria-required="true" placeholder="https://www.youtube.com/watch?v=…" required />
-            <button class="chip chip-primary" id="read-video" type="submit">Read transcript</button>
+            <button class="chip chip-primary" id="read-video" type="submit">Read video</button>
           </div>
           <p class="helper" id="video-helper" data-default="Public YouTube videos with captions work best." aria-live="polite">Public YouTube videos with captions work best.</p>
         </form>
       </section>
       <section class="workspace">
         <aside class="queue-pane" aria-label="Reading queue">
+          <details id="queue-drawer" class="queue-drawer" open>
+            <summary class="queue-drawer-toggle"><span>Reading queue</span><span id="queue-drawer-count">0 unread</span><span class="queue-disclose" aria-hidden="true">+</span></summary>
+            <div class="queue-drawer-content">
           <header class="queue-head">
             <h2>Reading queue</h2>
             <button class="chip chip-quiet" id="add-channel">Follow channel</button>
           </header>
-          <details class="channel-picker" id="channel-picker" open>
+          <details class="channel-picker" id="channel-picker">
             <summary class="channel-picker-summary">
               <span class="channel-picker-current">
                 <span>Channel</span>
@@ -65,6 +73,8 @@
           <div id="video-list" class="entries"></div>
           <p class="channel-line" id="channel-line"></p>
           </section>
+            </div>
+          </details>
         </aside>
         <article class="reader" id="reader" aria-label="Reader" tabindex="0"></article>
       </section>
@@ -81,8 +91,13 @@
     <dialog id="summary-dialog" aria-labelledby="summary-dialog-title" aria-describedby="summary-dialog-description">
       <form method="dialog">
         <button class="close" value="cancel" aria-label="Close">×</button>
-        <h2 id="summary-dialog-title">Reading settings</h2>
-        <p class="dialog-intro" id="summary-dialog-description">Applies to distillations and transcripts. Saved in this browser.</p>
+        <h2 id="summary-dialog-title">Settings</h2>
+        <p class="dialog-intro" id="summary-dialog-description">Make yourself comfortable.</p>
+        <div class="settings-tabs" role="tablist" aria-label="Settings section">
+          <button id="settings-tab-reading" type="button" role="tab" aria-selected="true" aria-controls="settings-panel-reading" data-settings-tab="reading">Reading</button>
+          <button id="settings-tab-ai" type="button" role="tab" aria-selected="false" aria-controls="settings-panel-ai" data-settings-tab="ai" tabindex="-1">AI</button>
+        </div>
+        <section id="settings-panel-reading" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-reading">
         <fieldset class="pref">
           <legend>Theme</legend>
           <div class="segment">
@@ -124,14 +139,25 @@
           </div>
           <p class="helper">Used when the video is hidden.</p>
         </fieldset>
-        <p class="helper">Reading preferences apply to the distillation and transcript. Saved in this browser.</p>
-        <h3>AI provider</h3>
-        <label>Provider<select id="summary-provider"><option value="codex">My Codex session</option><option value="claude-session">My Claude session</option><option value="anthropic">Claude API key</option><option value="openai">OpenAI API key</option></select></label>
-        <label>API key<input id="summary-key" type="password" autocomplete="off" placeholder="Not needed for Codex or Claude sessions" /></label>
+        </section>
+        <section id="settings-panel-ai" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-ai" hidden>
+        <h3 class="visually-hidden">AI provider</h3>
+        <label>Provider<select id="summary-provider"><option value="chatgpt">My ChatGPT account</option><option value="codex">My Codex session</option><option value="claude-session">My Claude session</option><option value="anthropic">Claude API key</option><option value="openai">OpenAI API key</option></select></label>
+        <div id="chatgpt-account" hidden>
+          <p id="chatgpt-status" class="helper" role="status">Sign in to use your ChatGPT plan.</p>
+          <div class="chatgpt-actions">
+          <button id="chatgpt-connect" class="chip" type="button">Continue with ChatGPT</button>
+          <button id="chatgpt-cancel" class="chip" type="button" hidden>Cancel sign-in</button>
+          <button id="chatgpt-disconnect" class="chip" type="button" hidden>Disconnect ChatGPT</button>
+          <a class="text-action" href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">Manage usage</a>
+          </div>
+        </div>
+        <label id="summary-key-wrap">API key<input id="summary-key" type="password" autocomplete="off" placeholder="Not needed for Codex or Claude sessions" /></label>
         <label>Model<select id="summary-model"></select></label>
         <label id="custom-model-wrap" hidden>Custom model<input id="custom-summary-model" placeholder="Provider model ID" /></label>
         <label>Distillation prompt<textarea id="summary-prompt" rows="4" placeholder="e.g. Give me a three-bullet summary and one question to sit with"></textarea></label>
         <p class="helper">Nothing is sent until you choose an AI action. Focus uses the provider and model, but never this distillation prompt.</p>
+        </section>
         <button class="chip chip-primary submit" id="save-summary-settings" value="default">Done</button>
       </form>
     </dialog>
@@ -139,6 +165,6 @@
       <p>VidReader 2026</p>
     </footer>
     <div class="toast-region" id="toast-region" aria-live="polite" hidden></div>
-    <script src="./app.js?v=youtube-only-20260914"></script>
+    <script src="./app.js?v=reading-first-20261107-3"></script>
   </body>
 </html>

@@ -10,6 +10,7 @@ import { CLEANUP_VERSION, chunkTranscriptLines, parseCleanupResponse } from './f
 import { staticFileFor } from './static-files.mjs';
 import { parseVtt } from './vtt.mjs';
 import { checkRequest, securityHeaders } from './request-security.mjs';
+import { chatgptConnection } from './chatgpt.mjs';
 
 const exec = promisify(execFile);
 const root = process.cwd();
@@ -170,7 +171,7 @@ export async function transcript(videoId, { cacheDirectory = cache, execFileImpl
   throw new Error('No English captions are available for this video.');
 }
 
-const aiProviders = new Set(['openai', 'anthropic', 'codex', 'claude-session']);
+const aiProviders = new Set(['openai', 'anthropic', 'codex', 'claude-session', 'chatgpt']);
 const providerSignal = signal => AbortSignal.any([signal, AbortSignal.timeout(120000)]);
 
 function codexAccountId(accessToken, tokens) {
@@ -229,10 +230,11 @@ async function generateWithCodex(model, instructions, sourceText, task, signal) 
 
 async function generateText({ provider, apiKey, model, instructions, sourceText, maxTokens = 500, task = 'response', signal }) {
   signal.throwIfAborted();
-  if (!aiProviders.has(provider) || !sourceText || (!['codex', 'claude-session'].includes(provider) && !apiKey)) {
+  if (!aiProviders.has(provider) || !sourceText || (!['codex', 'claude-session', 'chatgpt'].includes(provider) && !apiKey)) {
     throw new Error('Choose a provider, add its API key when needed, and load a transcript first.');
   }
   const outputLimit = Math.max(1, Math.min(Number(maxTokens) || 500, 8000));
+  if (provider === 'chatgpt') return chatgptConnection.generate({ model, instructions, input: sourceText, signal: providerSignal(signal) });
   if (provider === 'codex') return generateWithCodex(model, instructions, sourceText, task, signal);
   if (provider === 'claude-session') return generateWithClaudeSession(model, instructions, sourceText, outputLimit, task, signal);
   const request = provider === 'openai'
@@ -307,7 +309,7 @@ async function cleanTranscript({ provider, apiKey, model, lines }, signal) {
   if (cleaned[0]) cleaned[0].paragraphStart = true;
   return { lines: cleaned, cleanupVersion: CLEANUP_VERSION };
 }
-export function createReaderServer() {
+export function createReaderServer({ chatgpt = chatgptConnection } = {}) {
   let activeRequests = 0;
   return createServer({ requestTimeout: 30000, headersTimeout: 10000 }, async (req, res) => {
   for (const [name, value] of Object.entries(securityHeaders)) res.setHeader(name, value);
@@ -319,8 +321,9 @@ export function createReaderServer() {
     if (rejection) return send(res, rejection.status, { error: rejection.error }, 'application/json', { ...privateNoStore, ...rejection.headers });
     const url = new URL(req.url, 'http://localhost');
     const aiAction = ['/api/summarize', '/api/focus-cleanup'].includes(url.pathname);
-    if (req.method !== (aiAction ? 'POST' : 'GET')) return send(res, 405, { error: 'Method not allowed.' }, 'application/json', { allow: aiAction ? 'POST' : 'GET' });
-    if (aiAction) {
+    const chatgptAction = ['/api/chatgpt/sign-in', '/api/chatgpt/cancel', '/api/chatgpt/disconnect'].includes(url.pathname);
+    if (req.method !== (aiAction || chatgptAction ? 'POST' : 'GET')) return send(res, 405, { error: 'Method not allowed.' }, 'application/json', { allow: aiAction || chatgptAction ? 'POST' : 'GET' });
+    if (aiAction || url.pathname === '/api/chatgpt/sign-in') {
       cancellation = new AbortController();
       req.once('aborted', cancel);
       res.once('close', cancel);
@@ -330,6 +333,14 @@ export function createReaderServer() {
       if (activeRequests >= 4) return send(res, 429, { error: 'The reader is busy. Try again shortly.' });
       activeRequests++;
       counted = true;
+    }
+    if (url.pathname === '/api/chatgpt/session') return send(res, 200, await chatgpt.session());
+    if (url.pathname === '/api/chatgpt/models') return send(res, 200, { models: await chatgpt.models() });
+    if (chatgptAction) {
+      await readJson(req);
+      if (url.pathname === '/api/chatgpt/cancel') { chatgpt.cancel(); return send(res, 200, await chatgpt.session()); }
+      if (url.pathname === '/api/chatgpt/disconnect') return send(res, 200, await chatgpt.disconnect());
+      return send(res, 200, await chatgpt.signIn(cancellation.signal));
     }
     if (url.pathname === '/api/channel') return send(res, 200, await videosFor(url.searchParams.get('source') || '', Number(url.searchParams.get('offset') || 0)));
     if (url.pathname === '/api/video') {

@@ -226,7 +226,7 @@ function renderChannels() {
     + (query && !visibleChannels.length ? '<p class="channel-empty">No channels match.</p>' : '');
   rail.querySelectorAll('.channel').forEach(button => button.onclick = () => {
     activeChannel = button.dataset.channel;
-    channelPicker.open = !matchMedia('(max-width: 59.999rem)').matches;
+    channelPicker.open = false;
     channelSearch.value = '';
     render();
   });
@@ -271,6 +271,7 @@ function render() {
   const unreadCount = videos.filter(video => !read.has(video.id)).length;
   const statusText = `${videos.length} in queue · ${unreadCount} unread`;
   if (queueStatus.textContent !== statusText) queueStatus.textContent = statusText;
+  document.querySelector('#queue-drawer-count').textContent = `${unreadCount} unread`;
   list.innerHTML = (visible.map(video => {
     const unread = !read.has(video.id);
     const active = video.id === selected?.id;
@@ -379,8 +380,9 @@ function videoPanelMarkup() {
 }
 
 function renderReader() {
+  document.body.classList.toggle('is-reading', Boolean(selected));
   if (!selected) {
-    reader.innerHTML = '<div class="reader-empty"><h2>Nothing open yet.</h2><p>Pick a video from the queue. The reader fetches its transcript and lays it out as readable text.</p></div>';
+    reader.innerHTML = '<div class="reader-empty"><h2>Nothing open yet.</h2><p>Pick a video from your queue, or paste a YouTube link above to start reading.</p></div>';
     return;
   }
   const saved = state('watchpaper-saved').has(selected.id);
@@ -511,6 +513,7 @@ function renderTranscript() {
 function selectVideo(id, scroll = true) {
   if (selected?.id === id) return;
   selected = videos.find(video => video.id === id);
+  if (matchMedia('(max-width: 59.999rem)').matches) document.querySelector('#queue-drawer').open = false;
   transcript = [];
   transcriptState = 'idle';
   transcriptError = '';
@@ -720,15 +723,22 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
   syncReadingSettings();
 });
 const summaryModels = {
+  chatgpt: [],
   codex: [['gpt-5.6-luna', 'GPT-5.6 Luna'], ['gpt-5.6-sol', 'GPT-5.6 Sol'], ['gpt-5.6', 'GPT-5.6']],
   'claude-session': [['claude-sonnet-4-5', 'Claude Sonnet 4.5'], ['claude-opus-4-5', 'Claude Opus 4.5']],
   anthropic: [['claude-sonnet-4-5', 'Claude Sonnet 4.5'], ['claude-opus-4-5', 'Claude Opus 4.5']],
   openai: [['gpt-5.6-luna', 'GPT-5.6 Luna'], ['gpt-5.6-sol', 'GPT-5.6 Sol'], ['gpt-5.6', 'GPT-5.6']],
 };
 function renderModelOptions(provider, selectedModel = '') {
-  const models = summaryModels[provider];
+  const models = summaryModels[provider] || [];
+  if (!models.length) {
+    document.querySelector('#summary-model').innerHTML = '<option value="">Sign in to load models</option>';
+    document.querySelector('#custom-model-wrap').hidden = true;
+    return;
+  }
+  if (provider === 'chatgpt' && !models.some(([id]) => id === selectedModel)) selectedModel = '';
   const known = models.some(([id]) => id === selectedModel);
-  document.querySelector('#summary-model').innerHTML = models.map(([id, label]) => `<option value="${id}">${label}</option>`).join('') + '<option value="custom">Custom model…</option>';
+  document.querySelector('#summary-model').innerHTML = models.map(([id, label]) => `<option value="${escape(id)}">${escape(label)}</option>`).join('') + (provider === 'chatgpt' ? '' : '<option value="custom">Custom model…</option>');
   document.querySelector('#summary-model').value = known || !selectedModel ? models[0][0] : 'custom';
   document.querySelector('#custom-summary-model').value = known ? '' : selectedModel;
   document.querySelector('#custom-model-wrap').hidden = document.querySelector('#summary-model').value !== 'custom';
@@ -738,18 +748,20 @@ function storedApiKey(provider) {
     ? sessionStorage.getItem(`watchpaper-summary-key-${provider}`) || ''
     : '';
 }
-function openSummarySettings() {
+function openSummarySettings(panel = 'reading') {
   syncReadingSettings();
-  const provider = localStorage.getItem('watchpaper-summary-provider') || 'codex';
+  const provider = localStorage.getItem('watchpaper-summary-provider') || 'chatgpt';
   document.querySelector('#summary-provider').value = provider;
   document.querySelector('#summary-key').value = storedApiKey(provider);
   document.querySelector('#summary-prompt').value = localStorage.getItem('watchpaper-summary-prompt') || '';
   renderModelOptions(provider, localStorage.getItem('watchpaper-summary-model') || '');
+  updateProviderControls();
+  showSettingsPanel(panel === 'ai' ? 'ai' : 'reading');
   summaryDialog.showModal();
   summaryDialog.scrollTop = 0;
-  summaryDialog.querySelector('input[name="theme"]:checked')?.focus({ preventScroll: true });
+  document.querySelector(panel === 'ai' ? '#settings-tab-ai' : '#settings-tab-reading').focus?.({ preventScroll: true });
 }
-document.querySelector('#summary-settings').onclick = openSummarySettings;
+document.querySelector('#summary-settings').onclick = () => openSummarySettings();
 document.querySelector('#save-summary-settings').onclick = () => {
   const provider = document.querySelector('#summary-provider').value;
   localStorage.setItem('watchpaper-summary-provider', provider);
@@ -763,12 +775,84 @@ document.querySelector('#save-summary-settings').onclick = () => {
 document.querySelector('#summary-provider').onchange = event => {
   renderModelOptions(event.target.value);
   document.querySelector('#summary-key').value = storedApiKey(event.target.value);
+  updateProviderControls();
 };
 document.querySelector('#summary-model').onchange = event => { document.querySelector('#custom-model-wrap').hidden = event.target.value !== 'custom'; };
+function showSettingsPanel(name, focus = false) {
+  for (const panel of ['reading', 'ai']) {
+    const active = panel === name;
+    const button = document.querySelector(`#settings-tab-${panel}`);
+    button.setAttribute('aria-selected', String(active));
+    button.tabIndex = active ? 0 : -1;
+    document.querySelector(`#settings-panel-${panel}`).hidden = !active;
+    if (active && focus) button.focus();
+  }
+  summaryDialog.scrollTop = 0;
+}
+for (const name of ['reading', 'ai']) {
+  const button = document.querySelector(`#settings-tab-${name}`);
+  button.onclick = () => showSettingsPanel(name);
+  button.onkeydown = event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    showSettingsPanel(event.key === 'Home' ? 'reading' : event.key === 'End' ? 'ai' : name === 'reading' ? 'ai' : 'reading', true);
+  };
+}
+function updateProviderControls() {
+  const provider = document.querySelector('#summary-provider').value;
+  document.querySelector('#chatgpt-account').hidden = provider !== 'chatgpt';
+  document.querySelector('#summary-key-wrap').hidden = !['openai', 'anthropic'].includes(provider);
+  if (provider === 'chatgpt') refreshChatGPT();
+}
+async function chatgptRequest(path, method = 'GET') {
+  const response = await fetch(`/api/chatgpt/${path}`, method === 'POST'
+    ? { method, headers: { 'content-type': 'application/json' }, body: '{}' } : undefined);
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || 'Could not connect to ChatGPT.');
+  return payload;
+}
+function showChatGPTSession(session) {
+  const connecting = session.status === 'connecting';
+  const connected = session.status === 'connected';
+  document.querySelector('#chatgpt-status').textContent = session.error || (connecting
+    ? 'Complete sign-in in your browser.' : session.sharing
+      ? `Using ChatGPT plan${session.name ? ` · ${session.name}` : ''}`
+      : connected ? 'Signed in. Reconnect to allow ChatGPT plan usage.' : 'Sign in to use your ChatGPT plan.');
+  document.querySelector('#chatgpt-connect').hidden = connecting || session.sharing;
+  document.querySelector('#chatgpt-cancel').hidden = !connecting;
+  document.querySelector('#chatgpt-disconnect').hidden = !connected && session.status !== 'reauth_required';
+}
+async function refreshChatGPT() {
+  try {
+    const session = await chatgptRequest('session');
+    showChatGPTSession(session);
+    summaryModels.chatgpt = session.sharing
+      ? (await chatgptRequest('models')).models.map(({ id, name }) => [id, name]) : [];
+    if (document.querySelector('#summary-provider').value === 'chatgpt') {
+      renderModelOptions('chatgpt', localStorage.getItem('watchpaper-summary-model') || '');
+    }
+  } catch (error) { document.querySelector('#chatgpt-status').textContent = error.message; }
+}
+document.querySelector('#chatgpt-connect').onclick = async () => {
+  showChatGPTSession({ status: 'connecting' });
+  let failure;
+  try { await chatgptRequest('sign-in', 'POST'); }
+  catch (error) { failure = error.message; }
+  await refreshChatGPT();
+  if (failure) document.querySelector('#chatgpt-status').textContent = failure;
+};
+document.querySelector('#chatgpt-cancel').onclick = async () => {
+  try { await chatgptRequest('cancel', 'POST'); await refreshChatGPT(); }
+  catch (error) { document.querySelector('#chatgpt-status').textContent = error.message; }
+};
+document.querySelector('#chatgpt-disconnect').onclick = async () => {
+  try { await chatgptRequest('disconnect', 'POST'); await refreshChatGPT(); }
+  catch (error) { document.querySelector('#chatgpt-status').textContent = error.message; }
+};
 async function summarizeVideo() {
-  const provider = localStorage.getItem('watchpaper-summary-provider') || 'codex';
+  const provider = localStorage.getItem('watchpaper-summary-provider') || 'chatgpt';
   const apiKey = storedApiKey(provider);
-  if (!provider || !['codex', 'claude-session'].includes(provider) && !apiKey) return openSummarySettings();
+  if (!provider || !['codex', 'claude-session', 'chatgpt'].includes(provider) && !apiKey) return openSummarySettings('ai');
   if (!transcript.length) return;
   const video = selected;
   const summary = document.querySelector('#digest-copy');
@@ -795,9 +879,9 @@ async function summarizeVideo() {
 }
 
 async function cleanFocusTranscript() {
-  const provider = localStorage.getItem('watchpaper-summary-provider') || 'codex';
+  const provider = localStorage.getItem('watchpaper-summary-provider') || 'chatgpt';
   const apiKey = storedApiKey(provider);
-  if (!provider || !['codex', 'claude-session'].includes(provider) && !apiKey) return openSummarySettings();
+  if (!provider || !['codex', 'claude-session', 'chatgpt'].includes(provider) && !apiKey) return openSummarySettings('ai');
   const sourceLines = focusSourceLines();
   if (!selected || !sourceLines.length) return;
   const video = selected;
@@ -884,7 +968,7 @@ videoForm.addEventListener('submit', async event => {
   }
   submit.disabled = false;
   submit.removeAttribute('aria-busy');
-  submit.textContent = 'Read transcript';
+  submit.textContent = 'Read video';
 });
 videoInput.addEventListener('input', () => {
   if (!videoInput.hasAttribute('aria-invalid')) return;
@@ -952,6 +1036,9 @@ channelPicker.addEventListener('toggle', () => {
   channelPicker.querySelector('.channel-picker-disclose').textContent = channelPicker.open ? 'Close' : 'Choose';
   if (channelPicker.open && openedFromSummary) channelSearch.focus();
 });
+const wideQueue = matchMedia('(min-width: 60rem)');
+document.querySelector('#queue-drawer').open = wideQueue.matches;
+wideQueue.addEventListener('change', event => { document.querySelector('#queue-drawer').open = event.matches; });
 channels = storedChannels();
 directVideos = storedDirectVideos();
 composeVideos();

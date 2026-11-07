@@ -6,15 +6,17 @@ import { execFileSync } from 'node:child_process';
 const root = fileURLToPath(new URL('../', import.meta.url));
 // Explicit files prevent caches, credentials, logs and local tools entering a release.
 const files = [
-  '.gitignore', '.nvmrc', 'README.md', 'SECURITY.md',
-  'package.json', 'requirements.in', 'requirements.txt',
-  'server.mjs', 'request-security.mjs', 'static-files.mjs',
+  '.gitignore', '.nvmrc', 'README.md', 'SECURITY.md', 'docs/vidreader.png',
+  'package.json', 'package-lock.json', 'requirements.in', 'requirements.txt',
+  'server.mjs', 'chatgpt.mjs', 'request-security.mjs', 'static-files.mjs',
   'focus-cleanup.mjs', 'vtt.mjs', 'app.js', 'preferences-init.js',
   'index.html', 'reader.css', 'tokens.css',
   'test/focus-cleanup.test.mjs',
   'test/server-static.test.mjs', 'test/youtube-transcript.test.mjs', 'test/vtt.test.mjs',
   'test/frontend-security.test.mjs', 'test/server-security.test.mjs',
   'scripts/export-public.mjs',
+  'test/chatgpt.test.mjs',
+  'vendor/siwc-local-0.1.0.tgz', 'vendor/CHATGPT-DEVKIT-LICENSE', 'vendor/README.md',
 ];
 const dist = join(root, 'dist');
 await mkdir(dist, { recursive: true });

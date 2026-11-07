@@ -13,16 +13,23 @@ nvm install
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip setuptools
 .venv/bin/python -m pip install --require-hashes -r requirements.txt
+npm ci
 npm start
 ```
 
-Open http://127.0.0.1:4173. The app has no npm dependencies. `yt-dlp` and its Python dependencies are pinned with hashes in `requirements.txt`. Node supplies its JavaScript runtime.
+Open http://127.0.0.1:4173. `yt-dlp` and its Python dependencies are pinned with hashes in `requirements.txt`. Node supplies its JavaScript runtime.
 
 ## Local access
 
 VidReader runs on `127.0.0.1:4173` without a login. It accepts connections from the local machine and rejects network clients. Keep it local because its optional integrations use the server owner's credentials. Host and origin checks remain enabled.
 
 ## Optional AI
+
+Open **Settings → AI**, choose **My ChatGPT account**, then select **Continue with ChatGPT**. Complete sign-in and allow plan usage in your browser. Eligible accounts can use their ChatGPT plan without an API key. Available models load after connection. **Disconnect ChatGPT** signs out of this app; **Manage usage** opens your ChatGPT usage settings.
+
+The connection stays on this computer in `~/.config/vidreader`, encrypted with a key in the OS credential store. macOS uses Keychain, Windows uses Credential Manager, and Linux requires an unlocked Secret Service. Sign-in stops if secure storage is unavailable. It does not use or change your saved Codex login.
+
+This sign-in flow is for the local app. Remotely hosted deployments need separate OpenAI access. Claude remains available through its API-key option. See [OpenAI's local-app guide](https://developers.openai.com/siwc/token-sharing-open-source) and the [DevKit provenance and license](vendor/README.md).
 
 AI actions run only when you choose one. API keys entered in settings stay in the browser's session storage, stored separately for each provider, and are sent to the local server for that provider's request. Session providers use the server owner's existing local credentials. Closing or reloading the tab cancels pending AI requests and stops subsequent cleanup chunks.
 

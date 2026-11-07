@@ -5,7 +5,8 @@ VidReader is intended for one person on localhost. The public source runs withou
 ## Access and data
 
 - The server binds to `127.0.0.1` and rejects clients outside loopback.
-- Optional AI sessions use the local server owner's credentials. Keep this personal instance on your own machine.
+- ChatGPT sign-in uses OpenAI’s local DevKit for OAuth, identity verification, permission checks, and token refresh. Its credential files are encrypted using an AES-GCM key in the OS credential store. Tokens never reach the browser or Git repository.
+- Optional legacy AI sessions use the local server owner's credentials. Keep this personal instance on your own machine.
 - Host validation and same-origin request checks protect against DNS rebinding and browser cross-origin requests. AI endpoints accept same-origin JSON POST requests only.
 - Channel resolution accepts fixed HTTPS YouTube hosts and supported channel paths. Redirects are refused. Subprocesses receive argument arrays and validated video/channel IDs.
 - The static-file allowlist excludes source, caches, configuration and credentials. API responses are not cached. Provider errors omit raw response bodies and subprocess diagnostics.
@@ -25,7 +26,9 @@ Python runtime dependencies are pinned with package hashes in `requirements.txt`
 uv pip compile --index-url https://pypi.org/simple --no-header --no-emit-index-url --generate-hashes requirements.in -o requirements.txt
 ```
 
-Audit the lockfile with `pip-audit -r requirements.txt` and check [yt-dlp advisories](https://github.com/yt-dlp/yt-dlp/security/advisories). Run `npm test` after updating. A clean dependency audit covers known advisories, not every possible defect.
+Run `npm audit` for Node dependencies and `npm ci` to install the locked versions. The pinned local ChatGPT DevKit archive includes its license and third-party notices; provenance is in `vendor/README.md`.
+
+Audit the Python lockfile with `pip-audit -r requirements.txt` and check [yt-dlp advisories](https://github.com/yt-dlp/yt-dlp/security/advisories). Run `npm test` after updating. A clean dependency audit covers known advisories, not every possible defect.
 
 ## Source distribution
 

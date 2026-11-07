@@ -112,7 +112,7 @@ test('keeps API keys with their provider when saving settings and using either A
   const storage = values => ({ getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) });
   const nodes = new Map();
   const node = selector => {
-    if (!nodes.has(selector)) nodes.set(selector, { value: '', hidden: false });
+    if (!nodes.has(selector)) nodes.set(selector, { value: '', hidden: false, setAttribute() {} });
     return nodes.get(selector);
   };
   const requests = [];
@@ -173,4 +173,21 @@ test('keeps API keys with their provider when saving settings and using either A
   await useBothActions();
   assert.ok(requests.slice(4).every(({ provider, apiKey }) => provider === 'codex' && apiKey === ''));
   assert.ok([...localValues.values()].every(value => !value.includes('synthetic-')), 'keys stay out of localStorage');
+});
+
+test('escapes ChatGPT model labels and selects an available model instead of a stale provider model', () => {
+  const nodes = new Map();
+  const node = selector => {
+    if (!nodes.has(selector)) nodes.set(selector, { value: '', hidden: false, setAttribute() {} });
+    return nodes.get(selector);
+  };
+  const context = vm.createContext({ document: { querySelector: node } });
+  const escapeStart = app.indexOf('const escape =');
+  vm.runInContext(app.slice(escapeStart, app.indexOf('\n', escapeStart)), context);
+  vm.runInContext(app.slice(app.indexOf('const summaryModels ='), app.indexOf('function storedApiKey')), context);
+  vm.runInContext(`summaryModels.chatgpt = [['available-model', '<img src=x onerror=alert(1)>']]; renderModelOptions('chatgpt', 'old-provider-model');`, context);
+  assert.equal(node('#summary-model').value, 'available-model');
+  assert.ok(!node('#summary-model').innerHTML.includes('<img'));
+  assert.ok(node('#summary-model').innerHTML.includes('&lt;img'));
+  assert.ok(!node('#summary-model').innerHTML.includes('value="custom"'));
 });
