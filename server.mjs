@@ -19,7 +19,7 @@ const ytDlp = join(root, '.venv/bin/yt-dlp');
 const ytDlpOptions = { timeout: 120000, maxBuffer: 2_000_000 };
 const ytDlpArgs = ['--ignore-config', '--no-playlist', '--js-runtimes', `node:${process.execPath}`];
 const channelPageSize = 10;
-const mime = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.json':'application/json' };
+const mime = { '.svg':'image/svg+xml', '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.json':'application/json' };
 const send = (res, status, body, type='application/json', headers={}) => { res.writeHead(status, { 'content-type': type, ...headers }); res.end(typeof body === 'string' ? body : JSON.stringify(body)); };
 const privateNoStore = { 'cache-control': 'private, no-store, max-age=0', pragma: 'no-cache' };
 const readJson = async req => {

@@ -4,17 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>VidReader</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=play-lens" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400..700;1,400..600&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./reader.css?v=reading-first-20261107-2" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,800&family=Geist+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400..700;1,400..600&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./reader.css?v=reader-fraunces-20261107" />
     <script src="./preferences-init.js"></script>
   </head>
   <body>
     <header class="masthead">
       <div class="mast-main">
-        <a class="wordmark" href="/" aria-label="VidReader home"><span class="wordmark-mark" aria-hidden="true">V</span><span>VidReader</span></a>
-        <span class="queue-status" id="queue-status" aria-live="polite">0 in queue · 0 unread</span>
+        <a class="wordmark" href="/" aria-label="VidReader home"><img class="wordmark-mark" src="/favicon.svg?v=play-lens" alt="" width="40" height="30" /><span>VidReader</span></a>
+        <form class="link-form" id="video-form">
+          <label for="video-url">Video link</label>
+          <div class="link-row">
+            <input id="video-url" type="url" inputmode="url" autocomplete="url" aria-describedby="video-helper" aria-required="true" placeholder="https://www.youtube.com/watch?v=…" required />
+            <button class="chip chip-primary" id="read-video" type="submit">Read video</button>
+          </div>
+          <p class="helper" id="video-helper" data-default="Public YouTube videos with captions work best." aria-live="polite">Public YouTube videos with captions work best.</p>
+        </form>
         <button class="mast-action mast-action-end settings-icon" id="summary-settings" aria-label="Settings" title="Settings">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
             <path d="M9.5 3h5l.7 2.5 2 .9 2.3-.7 2.5 4.3-1.8 1.8v2.4l1.8 1.8-2.5 4.3-2.3-.7-2 .9-.7 2.5h-5l-.7-2.5-2-.9-2.3.7L2 15.8 3.8 14v-2.4L2 9.8l2.5-4.3 2.3.7 2-.9z" />
@@ -29,17 +37,9 @@
           <h1 id="intake-title">Save your time reading.</h1>
           <p>Paste a YouTube link and read the transcript instead.</p>
         </div>
-        <form class="link-form" id="video-form">
-          <label for="video-url">Video link</label>
-          <div class="link-row">
-            <input id="video-url" type="url" inputmode="url" autocomplete="url" aria-describedby="video-helper" aria-required="true" placeholder="https://www.youtube.com/watch?v=…" required />
-            <button class="chip chip-primary" id="read-video" type="submit">Read video</button>
-          </div>
-          <p class="helper" id="video-helper" data-default="Public YouTube videos with captions work best." aria-live="polite">Public YouTube videos with captions work best.</p>
-        </form>
       </section>
       <section class="workspace">
-        <aside class="queue-pane" aria-label="Reading queue">
+        <aside class="queue-pane" aria-label="Reading queue" tabindex="0">
           <details id="queue-drawer" class="queue-drawer" open>
             <summary class="queue-drawer-toggle"><span>Reading queue</span><span id="queue-drawer-count">0 unread</span><span class="queue-disclose" aria-hidden="true">+</span></summary>
             <div class="queue-drawer-content">
@@ -161,10 +161,7 @@
         <button class="chip chip-primary submit" id="save-summary-settings" value="default">Done</button>
       </form>
     </dialog>
-    <footer class="foot-dense">
-      <p>VidReader 2026</p>
-    </footer>
     <div class="toast-region" id="toast-region" aria-live="polite" hidden></div>
-    <script src="./app.js?v=reading-first-20261107-3"></script>
+    <script src="./app.js?v=reader-fraunces-20261107"></script>
   </body>
 </html>

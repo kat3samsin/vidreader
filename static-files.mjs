@@ -1,5 +1,6 @@
 const staticFiles = new Map([
   ['/', 'index.html'],
+  ['/favicon.svg', 'favicon.svg'],
   ['/index.html', 'index.html'],
   ['/app.js', 'app.js'],
   ['/preferences-init.js', 'preferences-init.js'],

@@ -13,7 +13,7 @@ test('serves only the reader assets', async t => {
   const { port } = server.address();
   const origin = `http://127.0.0.1:${port}`;
 
-  for (const path of ['/', '/index.html', '/app.js', '/reader.css', '/tokens.css']) {
+  for (const path of ['/', '/index.html', '/app.js', '/reader.css', '/tokens.css', '/favicon.svg']) {
     assert.equal((await fetch(`${origin}${path}`)).status, 200, path);
   }
   for (const path of ['/server.mjs', '/request-security.mjs', '/.env.local', '/.cache/private.vtt', '/.DS_Store', '/../server.mjs']) {

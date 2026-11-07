@@ -16,10 +16,15 @@ let videoStart = 0;
 const savedReaderMode = localStorage.getItem('watchpaper-reader-mode');
 let readerMode = ['distill', 'focus', 'raw'].includes(savedReaderMode) ? savedReaderMode : 'focus';
 let videoOpen = localStorage.getItem('watchpaper-video-open') === '1';
+let videoExpanded = false;
+let youtubeApiPromise;
+let dockedPlayer;
+let dockedFrame;
+let dockedPlayerReady;
+let videoSeekRequest = 0;
 const list = document.querySelector('#video-list');
 const reader = document.querySelector('#reader');
 const channelLine = document.querySelector('#channel-line');
-const queueStatus = document.querySelector('#queue-status');
 const rail = document.querySelector('#channel-rail');
 const channelPicker = document.querySelector('#channel-picker');
 const channelSearch = document.querySelector('#channel-search');
@@ -178,7 +183,7 @@ async function loadChannels() {
   }
   loadingFeeds = true;
   render();
-  const results = await Promise.allSettled(channels.map(fetchChannel));
+  const results = await Promise.allSettled(channels.map(channel => fetchChannel(channel)));
   loadingFeeds = false;
   channelVideos = results.flatMap((result, index) => {
     if (result.status === 'fulfilled') return result.value;
@@ -235,7 +240,7 @@ function renderChannels() {
 function renderChannelLine(visibleCount) {
   const channel = channels.find(entry => channelKey(entry) === activeChannel);
   const total = videos.filter(video => activeChannel === 'all' || video.channelId === activeChannel).length;
-  const countLine = `${visibleCount} of ${total} — the queue scrolls on its own.`;
+  const countLine = `${visibleCount} of ${total}`;
   if (channel) {
     channelLine.innerHTML = `<span class="meta${channel.error ? ' is-error' : ''}">${escape(channel.error || countLine)}</span><button id="remove-channel" type="button">Remove channel</button>`;
     document.querySelector('#remove-channel').onclick = () => removeChannel(channel);
@@ -269,8 +274,6 @@ function render() {
   const visible = filteredVideos();
   renderChannelLine(visible.length);
   const unreadCount = videos.filter(video => !read.has(video.id)).length;
-  const statusText = `${videos.length} in queue · ${unreadCount} unread`;
-  if (queueStatus.textContent !== statusText) queueStatus.textContent = statusText;
   document.querySelector('#queue-drawer-count').textContent = `${unreadCount} unread`;
   list.innerHTML = (visible.map(video => {
     const unread = !read.has(video.id);
@@ -305,9 +308,10 @@ function focusSourceLines() {
     .map(line => ({
       content: line.content.normalize('NFC').replace(/\s+/g, ' ').replace(/\s+([,.;:!?])/g, '$1').trim(),
       speaker: line.speaker === true,
+      time: typeof line.time === 'string' ? line.time : '',
     }))
     .filter(line => line.content)
-    .map((line, id) => ({ id, content: line.content, ...(line.speaker ? { speaker: true } : {}) }));
+    .map((line, id) => ({ id, content: line.content, time: line.time, ...(line.speaker ? { speaker: true } : {}) }));
 }
 
 function focusFingerprint(lines) {
@@ -342,23 +346,41 @@ function paragraphizeFocusText(value) {
 }
 
 function focusParagraphs(lines = focusSourceLines()) {
+  const sources = new Map(focusSourceLines().map(line => [line.id, line]));
   const blocks = [];
-  let block = '';
-  const flush = () => { if (block) blocks.push(block); block = ''; };
+  let block = { text: '', cues: [] };
+  const flush = () => { if (block.text) blocks.push(block); block = { text: '', cues: [] }; };
   for (const line of lines) {
     const text = String(line.text ?? line.content ?? '').replace(/\s+/g, ' ').trim();
     if (!text) continue;
     const speakerChange = line.speaker === true || /^(?:>>|[\p{L}\p{M}][\p{L}\p{M}\p{N} .&'’()\-]{0,60}:)\s/u.test(text);
-    if (block && (line.paragraphStart || speakerChange)) flush();
+    if (block.text && (line.paragraphStart || speakerChange)) flush();
     if (/^\[[^\]]{1,80}\]$/.test(text)) {
       flush();
-      blocks.push(text);
+      blocks.push({ text, cues: [{ start: 0, id: line.id }] });
       continue;
     }
-    block = `${block}${block ? ' ' : ''}${text}`;
+    const separator = block.text ? ' ' : '';
+    block.cues.push({ start: block.text.length + separator.length, id: line.id });
+    block.text += separator + text;
   }
   flush();
-  return blocks.flatMap(paragraphizeFocusText);
+  return blocks.flatMap(block => {
+    let offset = 0;
+    let cue = 0;
+    return paragraphizeFocusText(block.text).map(text => {
+      while (cue + 1 < block.cues.length && block.cues[cue + 1].start <= offset) cue++;
+      const time = sources.get(block.cues[cue].id)?.time || '';
+      offset += text.length + 1;
+      return { text, time };
+    });
+  });
+}
+
+function timestampButton(value) {
+  const time = typeof value === 'string' ? value.replace(/\.\d+$/, '') : '';
+  if (!time) return '';
+  return `<button class="timestamp" type="button" data-seek="${timestampSeconds(value)}" aria-label="Jump video to ${escape(time)}">${escape(time)}</button>`;
 }
 
 function cachedFocusCleanup(videoId, sourceFingerprint) {
@@ -375,11 +397,28 @@ function resetFocusCleanupState() {
 function videoPanelMarkup() {
   if (!videoOpen) return '';
   const start = videoStart ? `&start=${Math.floor(videoStart)}` : '';
-  const source = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(selected.id)}?playsinline=1&rel=0${start}`;
-  return `<aside class="video-dock" aria-label="Video player"><div class="video-card"><div class="video-frame"><iframe id="video-frame" src="${source}" title="${escape(`Video: ${selected.title}`)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div><div class="video-toolbar"><a href="${escape(selected.url)}" target="_blank" rel="noreferrer">Open on YouTube</a><button id="hide-video" type="button">Hide</button></div></div><p>Transcript timestamps jump the video.</p></aside>`;
+  const source = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(selected.id)}?playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}${start}`;
+  return `<aside class="video-dock" aria-label="Video player"><div class="video-card"><div class="video-frame"><iframe id="video-frame" src="${source}" title="${escape(`Video: ${selected.title}`)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div><div class="video-toolbar"><a href="${escape(selected.url)}" target="_blank" rel="noreferrer" aria-label="Open on YouTube" title="Open on YouTube">${videoControlIcon('open')}</a><button id="resize-video" type="button" aria-pressed="${videoExpanded}" aria-label="${videoExpanded ? 'Small preview' : 'Enlarge video'}" title="${videoExpanded ? 'Small preview' : 'Enlarge video'}">${videoControlIcon(videoExpanded ? 'shrink' : 'expand')}</button><button id="hide-video" type="button" aria-label="Hide video" title="Hide video">${videoControlIcon('hide')}</button></div></div><p class="video-hint" role="status" hidden></p></aside>`;
+}
+
+function videoControlIcon(name) {
+  const paths = {
+    open: '<path d="M15 3h6v6M10 14 21 3"/><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/>',
+    expand: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>',
+    shrink: '<path d="M3 8h5V3m13 5h-5V3M8 21v-5H3m13 5v-5h5"/>',
+    hide: '<path d="m6 6 12 12M6 18 18 6"/>',
+    video: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/>',
+    videoOff: '<path d="m3 3 18 18M10 5h9a2 2 0 0 1 2 2v10M17 19H5a2 2 0 0 1-2-2V7"/>',
+    save: '<path d="M6 3h12v18l-6-4-6 4z"/>',
+    saved: '<path fill="currentColor" d="M6 3h12v18l-6-4-6 4z"/>',
+    remove: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
+  };
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths[name]}</svg>`;
 }
 
 function renderReader() {
+  dockedPlayer?.destroy();
+  dockedPlayer = dockedFrame = dockedPlayerReady = undefined;
   document.body.classList.toggle('is-reading', Boolean(selected));
   if (!selected) {
     reader.innerHTML = '<div class="reader-empty"><h2>Nothing open yet.</h2><p>Pick a video from your queue, or paste a YouTube link above to start reading.</p></div>';
@@ -390,8 +429,8 @@ function renderReader() {
   const labels = { distill: 'Distill', focus: 'Focus', raw: 'Raw' };
   const modeButtons = modes.map(mode => `<button id="mode-${mode}" class="mode-option${readerMode === mode ? ' is-active' : ''}" type="button" role="tab" aria-selected="${readerMode === mode}" aria-controls="reader-mode-content" tabindex="${readerMode === mode ? '0' : '-1'}" data-mode="${mode}">${labels[mode]}</button>`).join('');
   const open = videoOpen;
-  const sourceAction = `<button id="toggle-video" class="reader-control is-accent" type="button" aria-pressed="${open}">${open ? 'Hide video' : 'Show video'}</button>`;
-  reader.innerHTML = `<header class="reader-head"><p class="reader-kicker">${escape(selected.channel)} · ${escape(readerDate(selected))}</p><h2>${escape(selected.title)}</h2><div class="reader-actions"><div class="mode-switch" role="tablist" aria-label="Reading mode">${modeButtons}</div>${sourceAction}<button id="save-video" class="reader-control is-primary" type="button" aria-pressed="${saved}">${saved ? 'Saved' : 'Save for later'}</button><button id="remove-video" class="reader-control" type="button">Remove</button></div></header><div class="reader-content"><div class="reader-copy" id="reader-mode-content" role="tabpanel" aria-labelledby="mode-${readerMode}"></div>${videoPanelMarkup()}</div>`;
+  const sourceAction = `<button id="toggle-video" class="reader-control is-accent" type="button" aria-pressed="${open}" aria-label="${open ? 'Hide video' : 'Show video'}" title="${open ? 'Hide video' : 'Show video'}">${videoControlIcon(open ? 'videoOff' : 'video')}</button>`;
+  reader.innerHTML = `<header class="reader-head"><p class="reader-kicker">${escape(selected.channel)} · ${escape(readerDate(selected))}</p><h2>${escape(selected.title)}</h2><div class="reader-actions"><div class="mode-switch" role="tablist" aria-label="Reading mode">${modeButtons}</div><div class="reader-tools" role="group" aria-label="Reading actions">${sourceAction}<button id="save-video" class="reader-control is-primary" type="button" aria-pressed="${saved}" aria-label="${saved ? 'Remove from saved' : 'Save for later'}" title="${saved ? 'Remove from saved' : 'Save for later'}">${videoControlIcon(saved ? 'saved' : 'save')}</button><button id="remove-video" class="reader-control" type="button" aria-label="Remove from queue" title="Remove from queue">${videoControlIcon('remove')}</button></div></div></header><div class="reader-content${videoExpanded ? ' is-video-expanded' : ''}"><div class="reader-copy" id="reader-mode-content" role="tabpanel" tabindex="0" aria-labelledby="mode-${readerMode}"></div>${videoPanelMarkup()}</div>`;
   document.querySelectorAll('.mode-option').forEach(button => {
     button.onclick = () => setReaderMode(button.dataset.mode);
     button.onkeydown = event => {
@@ -408,6 +447,8 @@ function renderReader() {
   document.querySelector('#remove-video').onclick = removeVideo;
   const hideVideo = document.querySelector('#hide-video');
   if (hideVideo) hideVideo.onclick = toggleVideoDock;
+  const resizeVideo = document.querySelector('#resize-video');
+  if (resizeVideo) resizeVideo.onclick = toggleVideoSize;
   renderModeContent();
 }
 
@@ -419,21 +460,72 @@ function setReaderMode(mode) {
   document.querySelector(`#mode-${mode}`)?.focus({ preventScroll: true });
 }
 
+function toggleVideoSize() {
+  videoExpanded = !videoExpanded;
+  document.querySelector('.reader-content').classList.toggle('is-video-expanded', videoExpanded);
+  const button = document.querySelector('#resize-video');
+  button.innerHTML = videoControlIcon(videoExpanded ? 'shrink' : 'expand');
+  button.setAttribute('aria-label', videoExpanded ? 'Small preview' : 'Enlarge video');
+  button.title = videoExpanded ? 'Small preview' : 'Enlarge video';
+  button.setAttribute('aria-pressed', String(videoExpanded));
+}
+
 function toggleVideoDock() {
   videoOpen = !videoOpen;
-  if (!videoOpen) videoStart = 0;
+  if (!videoOpen) { videoStart = 0; videoExpanded = false; }
   localStorage.setItem('watchpaper-video-open', videoOpen ? '1' : '0');
   refreshReader();
 }
 
-function seekDockedVideo(seconds) {
+function youtubeAPI() {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  youtubeApiPromise ??= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const timer = setTimeout(() => { script.remove(); reject(new Error('YouTube did not respond.')); }, 15000);
+    window.onYouTubeIframeAPIReady = () => { clearTimeout(timer); resolve(window.YT); };
+    script.src = 'https://www.youtube.com/iframe_api';
+    script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error('YouTube could not be loaded.')); };
+    document.head.append(script);
+  }).catch(error => { youtubeApiPromise = undefined; throw error; });
+  return youtubeApiPromise;
+}
+
+async function readyVideoPlayer(frame) {
+  const api = await youtubeAPI();
+  if (!frame.isConnected) throw new Error('The video changed.');
+  if (frame === dockedFrame && dockedPlayerReady) return dockedPlayerReady;
+  dockedFrame = frame;
+  dockedPlayerReady = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('The player did not respond.')), 15000);
+    dockedPlayer = new api.Player(frame, { events: {
+      onReady: event => { clearTimeout(timer); resolve(event.target); },
+      onError: () => { clearTimeout(timer); reject(new Error('The video is unavailable.')); },
+    } });
+  });
+  return dockedPlayerReady;
+}
+
+async function seekDockedVideo(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return;
+  const request = ++videoSeekRequest;
+  const videoId = selected.id;
   videoStart = seconds;
   if (!videoOpen) {
     videoOpen = true;
     localStorage.setItem('watchpaper-video-open', '1');
+    refreshReader();
   }
-  refreshReader();
-  document.querySelector('.video-dock')?.scrollIntoView({ block: 'nearest' });
+  const frame = document.querySelector('#video-frame');
+  try {
+    const player = await readyVideoPlayer(frame);
+    if (request !== videoSeekRequest || selected?.id !== videoId || frame !== document.querySelector('#video-frame')) return;
+    player.seekTo(seconds, true);
+    player.playVideo();
+  } catch {
+    if (request !== videoSeekRequest || selected?.id !== videoId) return;
+    const hint = document.querySelector('.video-hint');
+    if (hint) { hint.hidden = false; hint.textContent = 'Could not jump to that time. Open the video on YouTube.'; hint.classList.add('is-error'); }
+  }
 }
 
 function renderModeContent() {
@@ -479,22 +571,20 @@ function renderModeContent() {
       : failed
         ? `<p class="mode-state is-error" role="status">${escape(transcriptError)}</p>`
         : paragraphs.length
-          ? `<div class="focus-copy">${paragraphs.map(paragraph => `<p>${escape(paragraph)}</p>`).join('')}</div>`
+          ? `<div class="focus-copy">${paragraphs.map(paragraph => `<p>${timestampButton(paragraph.time)}<span>${escape(paragraph.text)}</span></p>`).join('')}</div>`
           : '<p class="mode-state">No transcript is available.</p>';
     const meta = cleaned
       ? `AI-cleaned ${new Date(cleaned.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · ${cleaned.stored === false ? 'available until reload; this browser could not store it.' : 'stored in this browser.'}`
       : 'AI cleanup changes punctuation, capitalisation, and paragraph breaks only.';
-    target.innerHTML = `<section class="focus-mode"><header class="block-head"><h3>Focus</h3><span class="mode-meta">full transcript · no timestamps</span>${action}</header>${notice}${body}<p class="mode-meta focus-meta">${escape(meta)} Raw captions stay unchanged.</p></section>`;
+    target.innerHTML = `<section class="focus-mode"><header class="block-head"><h3>Focus</h3><span class="mode-meta">full transcript · paragraph timestamps</span>${action}</header>${notice}${body}<p class="mode-meta focus-meta">${escape(meta)} Raw captions stay unchanged.</p></section>`;
     const clean = document.querySelector('#clean-focus');
     if (clean) clean.onclick = cleanFocusTranscript;
+    target.querySelectorAll('[data-seek]').forEach(button => button.onclick = () => seekDockedVideo(Number(button.dataset.seek)));
     return;
   }
   const rows = transcript.map(line => {
-    const time = typeof line.time === 'string' ? line.time.replace(/\.\d+$/, '') : '';
-    const timestamp = time
-      ? `<button class="timestamp" type="button" data-seek="${timestampSeconds(line.time)}" aria-label="Jump video to ${escape(time)}">${escape(time)}</button>`
-      : '';
-    return `<p${time ? '' : ' class="has-no-time"'}>${timestamp}<span>${escape(line.content)}</span></p>`;
+    const timestamp = timestampButton(line.time);
+    return `<p${timestamp ? '' : ' class="has-no-time"'}>${timestamp}<span>${escape(line.content)}</span></p>`;
   }).join('');
   const body = loading
     ? '<p class="mode-state" role="status">Fetching captions… the first load of a video can take a minute.</p>'
@@ -513,6 +603,7 @@ function renderTranscript() {
 function selectVideo(id, scroll = true) {
   if (selected?.id === id) return;
   selected = videos.find(video => video.id === id);
+  videoExpanded = false;
   if (matchMedia('(max-width: 59.999rem)').matches) document.querySelector('#queue-drawer').open = false;
   transcript = [];
   transcriptState = 'idle';
@@ -898,7 +989,7 @@ async function cleanFocusTranscript() {
         provider,
         apiKey,
         model: localStorage.getItem('watchpaper-summary-model'),
-        lines: sourceLines,
+        lines: sourceLines.map(({ time, ...line }) => line),
       }),
     });
     const payload = await response.json();

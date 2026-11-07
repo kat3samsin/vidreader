@@ -93,15 +93,17 @@ test('saved YouTube items must use a matching HTTPS watch URL', () => {
 test('renders YouTube playback with timestamp seeking and the required referrer policy', () => {
   const context = vm.createContext({
     videoOpen: true,
+    videoExpanded: false,
+    location: { origin: 'http://127.0.0.1:4173' },
     videoStart: 12.9,
     selected: { id: 'abcdefghijk', title: 'Example video', url: 'https://www.youtube.com/watch?v=abcdefghijk' },
   });
   vm.runInContext(app.slice(app.indexOf('const escape ='), app.indexOf('const timestampSeconds')), context);
   vm.runInContext(app.slice(app.indexOf('function videoPanelMarkup()'), app.indexOf('function renderReader()')), context);
   const html = context.videoPanelMarkup();
-  assert.match(html, /src="https:\/\/www\.youtube-nocookie\.com\/embed\/abcdefghijk\?playsinline=1&rel=0&start=12"/);
+  assert.match(html, /src="https:\/\/www\.youtube-nocookie\.com\/embed\/abcdefghijk\?playsinline=1&rel=0&enablejsapi=1&origin=http%3A%2F%2F127\.0\.0\.1%3A4173&start=12"/);
   assert.match(html, /referrerpolicy="strict-origin-when-cross-origin"/);
-  assert.match(html, />Open on YouTube<\/a>/);
+  assert.match(html, /aria-label="Open on YouTube"/);
   context.videoOpen = false;
   assert.equal(context.videoPanelMarkup(), '');
 });
@@ -190,4 +192,63 @@ test('escapes ChatGPT model labels and selects an available model instead of a s
   assert.ok(!node('#summary-model').innerHTML.includes('<img'));
   assert.ok(node('#summary-model').innerHTML.includes('&lt;img'));
   assert.ok(!node('#summary-model').innerHTML.includes('value="custom"'));
+});
+
+test('timestamp clicks seek and play the existing iframe without rebuilding it', async () => {
+  const frame = { isConnected: true };
+  const calls = [];
+  let players = 0;
+  const context = vm.createContext({
+    window: { YT: { Player: function (target, { events }) {
+      assert.equal(target, frame);
+      players++;
+      this.seekTo = (...args) => calls.push(['seek', ...args]);
+      this.playVideo = () => calls.push(['play']);
+      queueMicrotask(() => events.onReady({ target: this }));
+    } } },
+    document: { querySelector: selector => selector === '#video-frame' ? frame : null },
+    videoOpen: true, videoStart: 0, videoSeekRequest: 0,
+    dockedPlayer: undefined, dockedFrame: undefined, dockedPlayerReady: undefined,
+    selected: { id: 'abcdefghijk' }, setTimeout, clearTimeout,
+    refreshReader() { assert.fail('Seeking an open video must not rebuild its iframe'); },
+  });
+  vm.runInContext(app.slice(app.indexOf('function youtubeAPI()'), app.indexOf('function renderModeContent()')), context);
+  await context.seekDockedVideo(12);
+  await context.seekDockedVideo(30);
+  assert.equal(players, 1);
+  assert.deepEqual(calls, [['seek', 12, true], ['play'], ['seek', 30, true], ['play']]);
+});
+
+test('Focus paragraph timestamps follow their first source cue after paragraph splitting', () => {
+  const context = vm.createContext({ transcript: [
+    { content: ' ', time: '00:00.000' },
+    { content: `${'First '.repeat(60)}sentence.`, time: '00:05.000' },
+    { content: `${'Second '.repeat(60)}sentence.`, time: '00:40.000' },
+  ] });
+  vm.runInContext(app.slice(app.indexOf('function focusSourceLines()'), app.indexOf('function cachedFocusCleanup')), context);
+  const paragraphs = context.focusParagraphs();
+  assert.deepEqual(Array.from(paragraphs, p => p.time), ['00:05.000', '00:40.000']);
+  const cleaned = context.focusParagraphs([
+    { id: 0, text: 'A cleaned opening.', paragraphStart: true },
+    { id: 1, text: 'A cleaned second paragraph.', paragraphStart: true },
+  ]);
+  assert.deepEqual(Array.from(cleaned, p => p.time), ['00:05.000', '00:40.000']);
+});
+
+test('loads the newest page for every channel instead of passing its array index as an offset', async () => {
+  const offsets = [];
+  const scope = vm.createContext({
+    channels: [{ source: '@first' }, { source: '@second' }, { source: '@third' }],
+    selected: { id: 'abcdefghijk' },
+    videos: [],
+    fetchChannel: async (channel, offset = 0) => {
+      offsets.push(offset);
+      return [{ id: channel.source }];
+    },
+    composeVideos() {}, render() {}, renderReader() {}, saveChannels() {},
+  });
+  vm.runInContext(app.slice(app.indexOf('async function loadChannels()'), app.indexOf('function filteredVideos()')), scope);
+  await scope.loadChannels();
+  assert.deepEqual(offsets, [0, 0, 0]);
+  assert.equal(vm.runInContext('channelVideos.length', scope), 3);
 });

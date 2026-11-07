@@ -1009,21 +1009,7 @@ dialog label textarea {
   font-size: var(--text-sm);
 }
 
-.foot-dense {
-  width: min(100%, var(--page-max));
-  margin-inline: auto;
-  border-top: var(--rule-hair) solid var(--color-rule-2);
-  padding: var(--space-sm) var(--page-gutter);
-}
 
-.foot-dense p {
-  max-width: 100ch;
-  margin: 0;
-  color: var(--color-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-}
 
 .toast-region {
   position: fixed;
@@ -1737,7 +1723,7 @@ textarea:focus-visible {
 
 .entry-thumb {
   display: block;
-  width: 5.5rem;
+  width: 46%;
   flex: none;
   overflow: clip;
   aspect-ratio: 16 / 9;
@@ -1766,7 +1752,7 @@ textarea:focus-visible {
   line-height: 1.3;
   white-space: normal;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 
 .entry .meta {
@@ -2107,8 +2093,8 @@ textarea:focus-visible {
 
 .video-dock {
   min-width: 0;
-  max-width: 26.25rem;
-  flex: 1 1 18.75rem;
+  max-width: 22rem;
+  flex: 0 1 22rem;
 }
 
 .video-card {
@@ -2134,6 +2120,7 @@ textarea:focus-visible {
 
 .video-toolbar {
   display: flex;
+  flex-wrap: wrap;
   min-height: 2.75rem;
   align-items: center;
   justify-content: flex-end;
@@ -2143,7 +2130,13 @@ textarea:focus-visible {
 
 .video-toolbar a,
 .video-toolbar button {
-  min-height: 2.75rem;
+  display: inline-flex;
+  width: var(--control-height);
+  min-width: var(--control-height);
+  height: var(--control-height);
+  min-height: var(--control-height);
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: var(--color-muted);
@@ -2328,18 +2321,7 @@ dialog label {
   margin-top: var(--space-lg);
 }
 
-.foot-dense {
-  padding: var(--space-sm) var(--page-gutter) var(--space-lg);
-  border-top: var(--rule-hair) solid var(--color-rule);
-  color: var(--color-muted);
-  font-family: var(--font-body);
-  font-size: .75rem;
-}
 
-.foot-dense p {
-  width: min(100%, var(--page-max));
-  margin: 0 auto;
-}
 
 .toast {
   border-color: var(--color-control-border);
@@ -2431,45 +2413,65 @@ dialog label {
 }
 
 @media (min-width: 60rem) {
+  html {
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
-    display: block;
-    height: auto;
+    display: grid;
+    height: 100dvh;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
   }
 
   .app-main {
-    display: block;
+    display: grid;
+    min-height: 0;
+    grid-template-columns: calc(18rem + var(--page-gutter) + var(--space-xl)) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .intake {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 3rem;
-    padding-block: 2.25rem 2.5rem;
+    grid-column: 2;
+    grid-row: 1;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-lg);
+    padding: var(--space-lg) var(--page-gutter) var(--space-lg) var(--space-xl);
   }
 
   .workspace {
-    display: grid;
-    grid-template-columns: 18rem minmax(0, 1fr);
-    gap: var(--space-xl);
-    padding-block: 0 4.5rem;
+    display: contents;
   }
 
   .queue-pane,
   .reader {
     min-height: 0;
-    overflow: visible;
-    padding-bottom: var(--space-xl);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .queue-pane {
-    padding-top: 1.75rem;
-    padding-inline-end: 0;
+    grid-column: 1;
+    grid-row: 1 / 3;
+    border-inline-end: var(--rule-hair) solid var(--color-rule);
+    padding: var(--space-lg) var(--space-xl) var(--space-lg) var(--page-gutter);
+  }
+
+  .queue-pane .entries {
+    max-height: none;
+    overflow-y: visible;
   }
 
   .reader {
-    border-top: 0;
-    border-inline-start: var(--rule-hair) solid var(--color-rule);
-    padding-top: 1.75rem;
-    padding-inline-start: var(--space-xl);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    container: reader / inline-size;
+    grid-column: 2;
+    grid-row: 2;
+    overflow: hidden;
+    border: 0;
+    padding: var(--space-lg) var(--page-gutter) var(--space-lg) var(--space-xl);
   }
 
   .channel-picker-summary {
@@ -2478,7 +2480,7 @@ dialog label {
 
   .channel-picker-panel {
     display: grid;
-    margin-top: 0;
+    margin-top: var(--space-md);
   }
 
   .index-tools {
@@ -2551,12 +2553,8 @@ dialog label {
   }
 
   .video-dock {
-    max-width: none;
+    max-width: min(100%, 18rem);
     flex-basis: 100%;
-  }
-
-  .entry-thumb {
-    width: 4.75rem;
   }
 
   dialog {
@@ -2685,9 +2683,6 @@ body.is-reading .link-form:focus-within > .helper {
     display: none;
   }
 
-  .entry-thumb {
-    width: 4.5rem;
-  }
 }
 
 @media (max-width: 59.999rem) {
@@ -2717,4 +2712,412 @@ body.is-reading .link-form:focus-within > .helper {
   align-items: center;
   justify-content: center;
   padding: 0;
+}
+
+.reader-content.is-video-expanded .video-dock {
+  position: static;
+  width: 100%;
+  max-width: 56rem;
+  flex-basis: 100%;
+}
+
+@media (min-width: 0rem) {
+  .reader-content {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-lg);
+    overflow: hidden;
+    margin-top: var(--space-lg);
+  }
+
+  .reader-content:not(:has(> .video-dock)) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reader-copy {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-inline-end: var(--space-sm);
+    padding-bottom: var(--space-lg);
+  }
+
+  .video-dock {
+    grid-column: 2;
+    grid-row: 1;
+    position: static;
+    min-height: 0;
+    max-height: 100%;
+  }
+
+  .reader-content.is-video-expanded {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 45%) minmax(0, 1fr);
+  }
+
+  .reader-content.is-video-expanded .video-dock {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: column;
+  }
+
+  .reader-content.is-video-expanded .video-card {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .reader-content.is-video-expanded .video-frame {
+    min-height: 0;
+    flex-shrink: 1;
+  }
+
+  .video-toolbar {
+    flex-shrink: 0;
+  }
+
+  .reader-content.is-video-expanded .reader-copy {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  @container reader (max-width: 50rem) {
+    .reader-content:has(> .video-dock) {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .reader-content > .video-dock {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .reader-content:has(> .video-dock) > .reader-copy {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .reader-content.is-video-expanded {
+      grid-template-rows: minmax(0, 45%) minmax(0, 1fr);
+    }
+  }
+}
+
+.reader-copy:focus-visible {
+  outline: var(--rule-fine) solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+@media (max-width: 59.999rem) {
+  html {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    display: grid;
+    height: 100dvh;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .masthead {
+    padding-block: var(--space-xs);
+  }
+
+  .queue-status {
+    display: none;
+  }
+
+  .app-main {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .workspace {
+    display: contents;
+  }
+
+  .intake {
+    grid-row: 1;
+    padding-inline: var(--page-gutter);
+  }
+
+  body.is-reading .intake {
+    padding-block: var(--space-xs);
+  }
+
+  body.is-reading .link-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  body.is-reading .link-row .chip {
+    width: auto;
+    padding-inline: var(--space-sm);
+  }
+
+  .queue-pane {
+    grid-row: 2;
+    min-height: 0;
+    max-height: 35dvh;
+    overflow-y: auto;
+    padding-inline: var(--page-gutter);
+  }
+
+  .reader {
+    display: grid;
+    container: reader / inline-size;
+    grid-row: 3;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    overflow: hidden;
+    padding: var(--space-sm) var(--page-gutter);
+  }
+
+  .reader-head h2 {
+    font-size: var(--text-xl);
+  }
+
+  .reader-actions {
+    gap: var(--space-2xs);
+    margin-top: var(--space-sm);
+  }
+
+  .reader-actions .mode-switch {
+    width: auto;
+    margin-inline-end: auto;
+  }
+
+  .mode-option {
+    padding-inline: var(--space-xs);
+  }
+
+  .reader-control {
+    flex: none;
+    padding-inline: var(--space-2xs);
+    font-size: .75rem;
+  }
+
+  .reader-content {
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+  }
+
+  .video-dock {
+    width: 12rem;
+    max-width: 100%;
+  }
+
+  .video-dock > p:not(.is-error) {
+    display: none;
+  }
+
+  .video-toolbar {
+    gap: var(--space-2xs);
+    padding: var(--space-2xs) var(--space-xs);
+  }
+}
+
+.mast-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-lg);
+}
+
+.mast-main .wordmark {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.mast-main .wordmark-mark {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: .875rem;
+}
+
+.mast-main .link-form {
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+  max-width: 46rem;
+  justify-self: center;
+}
+
+.mast-main .link-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.mast-main .link-row .chip {
+  width: auto;
+}
+
+.mast-main .link-form > .helper:not(.is-error) {
+  display: none;
+}
+
+body.is-reading .intake {
+  display: none;
+}
+
+.focus-copy .timestamp {
+  display: inline-block;
+  margin-inline-end: var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: .6875rem;
+  vertical-align: baseline;
+}
+
+@media (max-width: 59.999rem) {
+  .mast-main {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--space-sm);
+  }
+}
+
+@media (max-width: 39.999rem) {
+  .mast-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mast-main .wordmark {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 1.375rem;
+  }
+
+  .mast-main .settings-icon {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .mast-main .link-form {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (min-width: 40rem) {
+  .mast-main .settings-icon {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+}
+
+.reader-tools {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-2xs);
+  margin-inline-start: auto;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-control);
+  background: var(--color-paper-2);
+  padding: var(--space-2xs);
+}
+
+.reader-tools .reader-control {
+  width: var(--control-height);
+  min-width: var(--control-height);
+  height: var(--control-height);
+  justify-content: center;
+  padding: 0;
+}
+
+.reader-tools .reader-control[aria-pressed="true"] {
+  background: var(--color-accent-tint);
+}
+
+/* Keep scroll rails quiet until the pane is in use. */
+.queue-pane,
+.reader-copy {
+  scrollbar-color: transparent transparent;
+}
+
+.queue-pane:hover,
+.queue-pane:focus-visible,
+.reader-copy:hover,
+.reader-copy:focus-visible {
+  scrollbar-color: var(--color-control-border) transparent;
+}
+
+.queue-pane::-webkit-scrollbar-thumb,
+.reader-copy::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+.queue-pane:hover::-webkit-scrollbar-thumb,
+.queue-pane:focus-visible::-webkit-scrollbar-thumb,
+.reader-copy:hover::-webkit-scrollbar-thumb,
+.reader-copy:focus-visible::-webkit-scrollbar-thumb {
+  background-color: var(--color-control-border);
+}
+
+.video-hint[hidden] {
+  display: none;
+}
+
+/* Selected type direction: Fraunces ExtraBold for headings and labels. */
+:root {
+  --font-heading: "Fraunces", ui-serif, Georgia, serif;
+}
+
+.reader-head h2,
+.reader-empty h2,
+.queue-head h2,
+.entry-title,
+.block-head h3,
+dialog h2,
+dialog h3,
+.mode-option,
+.filter,
+.chip,
+.text-action,
+.segment label {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-optical-sizing: auto;
+}
+
+.reader-head h2 {
+  font-size: clamp(2rem, 4vw, 2.875rem);
+}
+
+.queue-head h2,
+.block-head h3,
+dialog h2 {
+  font-size: 1.4375rem;
+}
+
+.mode-option {
+  font-size: 1.125rem;
+}
+
+.queue-head {
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.mast-main .wordmark-mark {
+  width: 2.5rem;
+  height: 1.875rem;
+  border-radius: 0;
+  background: transparent;
+}
+
+@media (max-width: 59.999rem) {
+  .reader-head h2 {
+    font-size: 1.75rem;
+  }
 }

@@ -10,7 +10,7 @@ const files = [
   'package.json', 'package-lock.json', 'requirements.in', 'requirements.txt',
   'server.mjs', 'chatgpt.mjs', 'request-security.mjs', 'static-files.mjs',
   'focus-cleanup.mjs', 'vtt.mjs', 'app.js', 'preferences-init.js',
-  'index.html', 'reader.css', 'tokens.css',
+  'index.html', 'favicon.svg', 'reader.css', 'tokens.css',
   'test/focus-cleanup.test.mjs',
   'test/server-static.test.mjs', 'test/youtube-transcript.test.mjs', 'test/vtt.test.mjs',
   'test/frontend-security.test.mjs', 'test/server-security.test.mjs',
