@@ -2058,7 +2058,8 @@ textarea:focus-visible {
   margin-top: var(--space-md);
 }
 
-.reader-content:not(:has(> .video-dock)) :is(.digest-copy, .focus-copy, .transcript, .focus-meta, .mode-state) {
+.reader-content:not(:has(> .video-dock)) :is(.digest-copy, .focus-copy, .transcript, .focus-meta, .mode-state),
+.reader-content.is-video-expanded :is(.digest-copy, .focus-copy, .transcript, .focus-meta, .mode-state) {
   max-width: var(--reader-width, none);
 }
 
@@ -2717,7 +2718,7 @@ body.is-reading .link-form:focus-within > .helper {
 .reader-content.is-video-expanded .video-dock {
   position: static;
   width: 100%;
-  max-width: 56rem;
+  max-width: none;
   flex-basis: 100%;
 }
 
@@ -2787,6 +2788,8 @@ body.is-reading .link-form:focus-within > .helper {
   .reader-content.is-video-expanded .reader-copy {
     grid-column: 1;
     grid-row: 2;
+    max-width: none;
+    padding-inline-end: 0;
   }
 
   @container reader (max-width: 50rem) {
@@ -2937,6 +2940,7 @@ body.is-reading .link-form:focus-within > .helper {
 .mast-main .wordmark {
   grid-column: 1;
   grid-row: 1;
+  font-family: var(--font-heading);
   font-size: 1.5rem;
   font-weight: 700;
 }
@@ -3068,9 +3072,9 @@ body.is-reading .intake {
   display: none;
 }
 
-/* Selected type direction: Fraunces ExtraBold for headings and labels. */
+/* Selected type direction: Newsreader Bold for headings and labels. */
 :root {
-  --font-heading: "Fraunces", ui-serif, Georgia, serif;
+  --font-heading: "Newsreader", ui-serif, Georgia, serif;
 }
 
 .reader-head h2,
@@ -3086,7 +3090,7 @@ dialog h3,
 .text-action,
 .segment label {
   font-family: var(--font-heading);
-  font-weight: 800;
+  font-weight: 700;
   font-optical-sizing: auto;
 }
 
@@ -3120,4 +3124,26 @@ dialog h2 {
   .reader-head h2 {
     font-size: 1.75rem;
   }
+}
+
+#read-video {
+  font-size: 1.125rem;
+  line-height: 1;
+  padding-block: .625rem .375rem;
+  padding-inline: 1.125rem;
+}
+
+.mast-main .link-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.mast-main .link-row .follow-channel-icon {
+  width: var(--control-height-touch);
+  min-width: var(--control-height-touch);
+  padding: 0;
+  color: var(--color-accent);
+}
+
+body.is-reading .link-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
 }

@@ -4,22 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>VidReader</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=play-lens" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=blue-play" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,800&family=Geist+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400..700;1,400..600&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./reader.css?v=reader-fraunces-20261107" />
+    <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400..700;1,400..600&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./reader.css?v=reader-follow-20261107" />
     <script src="./preferences-init.js"></script>
   </head>
   <body>
     <header class="masthead">
       <div class="mast-main">
-        <a class="wordmark" href="/" aria-label="VidReader home"><img class="wordmark-mark" src="/favicon.svg?v=play-lens" alt="" width="40" height="30" /><span>VidReader</span></a>
+        <a class="wordmark" href="/" aria-label="VidReader home"><img class="wordmark-mark" src="/favicon.svg?v=blue-play" alt="" width="40" height="30" /><span>VidReader</span></a>
         <form class="link-form" id="video-form">
           <label for="video-url">Video link</label>
           <div class="link-row">
             <input id="video-url" type="url" inputmode="url" autocomplete="url" aria-describedby="video-helper" aria-required="true" placeholder="https://www.youtube.com/watch?v=…" required />
             <button class="chip chip-primary" id="read-video" type="submit">Read video</button>
+            <button class="chip chip-quiet follow-channel-icon" id="add-channel" type="button" aria-label="Follow channel" title="Follow channel"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
           </div>
           <p class="helper" id="video-helper" data-default="Public YouTube videos with captions work best." aria-live="polite">Public YouTube videos with captions work best.</p>
         </form>
@@ -45,7 +46,6 @@
             <div class="queue-drawer-content">
           <header class="queue-head">
             <h2>Reading queue</h2>
-            <button class="chip chip-quiet" id="add-channel">Follow channel</button>
           </header>
           <details class="channel-picker" id="channel-picker">
             <summary class="channel-picker-summary">
@@ -81,7 +81,7 @@
     </main>
     <dialog id="channel-dialog">
       <form method="dialog">
-        <button class="close" value="cancel" aria-label="Close">×</button>
+        <button class="close" value="cancel" formnovalidate aria-label="Close">×</button>
         <h2>Add a channel</h2>
         <label>Channel URL or @handle<input id="channel-url" aria-describedby="channel-helper" aria-required="true" placeholder="youtube.com/@creator" required /></label>
         <p class="helper" id="channel-helper" data-default="VidReader reads the channel’s public feed and pulls English captions when they exist.">VidReader reads the channel’s public feed and pulls English captions when they exist.</p>
@@ -137,7 +137,7 @@
             <output id="reader-width-value" aria-live="polite">Full width</output>
             <button id="reader-width-up" type="button" aria-label="Widen column" aria-describedby="reader-width-value">+</button>
           </div>
-          <p class="helper">Used when the video is hidden.</p>
+          <p class="helper">Used when the video is hidden or enlarged.</p>
         </fieldset>
         </section>
         <section id="settings-panel-ai" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-ai" hidden>
@@ -162,6 +162,6 @@
       </form>
     </dialog>
     <div class="toast-region" id="toast-region" aria-live="polite" hidden></div>
-    <script src="./app.js?v=reader-fraunces-20261107"></script>
+    <script src="./app.js?v=reader-follow-20261107"></script>
   </body>
 </html>
