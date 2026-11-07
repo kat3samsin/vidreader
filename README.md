@@ -2,6 +2,8 @@
 
 A personal, caption-first video reader. Paste a public YouTube link to read its English captions, follow channels, or choose an AI provider for a distillation. Captions are cached locally. Focus mode keeps the full transcript and can validate an optional AI punctuation pass against the original words.
 
+![VidReader showing the reading queue, AI distillation controls, and YouTube video player.](docs/vidreader.png)
+
 ## Run locally
 
 Install Node.js 24.21.0 or a newer Node.js 24 release, a current Python 3.11 or newer patch release, and a Python virtual environment. The server refuses unsupported Node versions:
