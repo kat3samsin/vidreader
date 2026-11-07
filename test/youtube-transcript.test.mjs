@@ -90,3 +90,54 @@ test('distinguishes a failed download from missing English captions', async t =>
     execFileImpl: async () => {},
   }), { message: 'No English captions are available for this video.' });
 });
+
+test('downloads original English without requesting the rate-limited translation', async t => {
+  const cacheDirectory = await cacheFor(t);
+  let downloads = 0;
+  const lines = await transcript(videoId, {
+    cacheDirectory,
+    execFileImpl: async (_file, args) => {
+      downloads++;
+      if (args[args.indexOf('--sub-langs') + 1] !== 'en.*-orig') {
+        throw new Error('HTTP Error 429: Too Many Requests');
+      }
+      await writeFile(join(cacheDirectory, `${videoId}.en-orig.vtt`), vtt);
+    },
+  });
+  assert.equal(downloads, 1);
+  assert.deepEqual(lines, expected);
+});
+
+test('uses uploaded regional English subtitles when original auto captions are absent', async t => {
+  const cacheDirectory = await cacheFor(t);
+  let downloads = 0;
+  const lines = await transcript(videoId, {
+    cacheDirectory,
+    execFileImpl: async (_file, args) => {
+      downloads++;
+      if (!args.includes('--write-subs')) return;
+      assert.ok(!args.includes('--write-auto-subs'));
+      await writeFile(join(cacheDirectory, `${videoId}.en-GB.vtt`), vtt);
+    },
+  });
+  assert.equal(downloads, 2);
+  assert.deepEqual(lines, expected);
+});
+
+test('waits before requesting one English translation when native English tracks are absent', async t => {
+  const cacheDirectory = await cacheFor(t);
+  let downloads = 0;
+  const lines = await transcript(videoId, {
+    cacheDirectory,
+    execFileImpl: async (_file, args, options) => {
+      downloads++;
+      if (downloads < 3) return;
+      assert.equal(args[args.indexOf('--sub-langs') + 1], 'en');
+      assert.equal(args[args.indexOf('--sleep-subtitles') + 1], '60');
+      assert.ok(options.timeout > 60_000);
+      await writeFile(join(cacheDirectory, `${videoId}.en.vtt`), vtt);
+    },
+  });
+  assert.equal(downloads, 3);
+  assert.deepEqual(lines, expected);
+});

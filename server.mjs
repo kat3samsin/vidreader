@@ -144,20 +144,28 @@ export async function transcript(videoId, { cacheDirectory = cache, execFileImpl
   };
   const cached = await cachedTranscript();
   if (cached) return cached;
-  let downloadError;
-  try {
-    await execFileImpl(ytDlp, [...ytDlpArgs, '--skip-download', '--write-auto-subs', '--write-subs', '--sub-langs', 'en.*,en', '--sub-format', 'vtt', '--output', join(cacheDirectory, '%(id)s.%(ext)s'), `https://www.youtube.com/watch?v=${videoId}`], ytDlpOptions);
-  } catch (error) {
-    downloadError = error;
-  }
-  // One subtitle variant can fail after another has been saved successfully.
-  const downloaded = await cachedTranscript();
-  if (downloaded) return downloaded;
-  if (downloadError) {
-    if (/HTTP Error 429|Too Many Requests/i.test(`${downloadError.stderr || ''}\n${downloadError.message}`)) {
-      throw new Error('YouTube is temporarily limiting caption downloads. Try again later.');
+  // Avoid translated tracks when original English captions are available.
+  const captionAttempts = [
+    ['--write-auto-subs', '--sub-langs', 'en.*-orig'],
+    ['--write-subs', '--sub-langs', 'en.*'],
+    ['--write-auto-subs', '--sub-langs', 'en', '--sleep-subtitles', '60'],
+  ];
+  for (const captionArgs of captionAttempts) {
+    let downloadError;
+    try {
+      await execFileImpl(ytDlp, [...ytDlpArgs, '--skip-download', ...captionArgs, '--sub-format', 'vtt', '--output', join(cacheDirectory, '%(id)s.%(ext)s'), `https://www.youtube.com/watch?v=${videoId}`], ytDlpOptions);
+    } catch (error) {
+      downloadError = error;
     }
-    throw new Error('Could not download captions from YouTube. Try again later.');
+    // One subtitle variant can fail after another has been saved successfully.
+    const downloaded = await cachedTranscript();
+    if (downloaded) return downloaded;
+    if (downloadError) {
+      if (/HTTP Error 429|Too Many Requests/i.test(`${downloadError.stderr || ''}\n${downloadError.message}`)) {
+        throw new Error('YouTube is temporarily limiting caption downloads. Try again later.');
+      }
+      throw new Error('Could not download captions from YouTube. Try again later.');
+    }
   }
   throw new Error('No English captions are available for this video.');
 }
