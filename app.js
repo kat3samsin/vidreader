@@ -601,10 +601,14 @@ function renderTranscript() {
 }
 
 function selectVideo(id, scroll = true) {
-  if (selected?.id === id) return;
+  const mobile = matchMedia('(max-width: 59.999rem)').matches;
+  if (mobile) document.querySelector('#queue-drawer').open = false;
+  if (selected?.id === id) {
+    if (mobile && scroll) reader.scrollIntoView({ behavior: 'auto', block: 'start' });
+    return;
+  }
   selected = videos.find(video => video.id === id);
   videoExpanded = false;
-  if (matchMedia('(max-width: 59.999rem)').matches) document.querySelector('#queue-drawer').open = false;
   transcript = [];
   transcriptState = 'idle';
   transcriptError = '';

@@ -3156,3 +3156,81 @@ dialog h2 {
 body.is-reading .link-row {
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
+
+/* On phones, scroll the page chrome away and keep the player above the text. */
+@media (max-width: 59.999rem) {
+  html {
+    height: auto;
+    overflow-y: auto;
+  }
+
+  body {
+    display: block;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .app-main,
+  .reader {
+    display: block;
+    overflow: visible;
+  }
+
+  .reader-content,
+  .reader-content.is-video-expanded {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    overflow: visible;
+  }
+
+  .reader-content > .reader-copy {
+    order: 2;
+    flex: none;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    padding-inline-end: 0;
+  }
+
+  .reader-content > .video-dock {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    order: 1;
+    width: 100%;
+    max-width: none;
+    flex: none;
+    max-height: none;
+    background: var(--color-paper);
+  }
+
+  .reader-content .video-card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .reader-content .video-frame {
+    flex-shrink: 1;
+    min-height: 0;
+    max-height: max(6rem, calc(32dvh - 3.5rem));
+  }
+}
+
+@media (max-width: 59.999rem) {
+  body:has(#queue-drawer[open]) .reader {
+    display: none;
+  }
+
+  .queue-pane:has(#queue-drawer[open]) {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .queue-pane:has(#queue-drawer[open]) .entries {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
