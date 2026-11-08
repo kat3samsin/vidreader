@@ -94,8 +94,8 @@ export function channelUrl(source) {
   url.hash = '';
   return url.href;
 }
-async function moreVideosFor(channelId, offset) {
-  const { stdout } = await exec(ytDlp, [
+async function moreVideosFor(channelId, offset, execFileImpl = exec) {
+  const { stdout } = await execFileImpl(ytDlp, [
     ...ytDlpArgs,
     '--flat-playlist',
     '--playlist-items', `${offset + 1}:${offset + channelPageSize + 1}`,
@@ -115,11 +115,16 @@ async function moreVideosFor(channelId, offset) {
   }));
   return { videos, hasMore: entries.length > channelPageSize };
 }
-async function videosFor(source, offset = 0) {
+export async function videosFor(source, offset = 0, { execFileImpl = exec } = {}) {
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 10000) throw new Error('Invalid channel page.');
   const channelId = await resolveChannel(source);
-  if (offset) return { channelId, ...await moreVideosFor(channelId, offset) };
-  const xml = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, { redirect: 'error', signal: AbortSignal.timeout(15000) }).then(r => { if (!r.ok) throw new Error('YouTube feed was unavailable.'); return r.text(); });
+  if (offset) return { channelId, ...await moreVideosFor(channelId, offset, execFileImpl) };
+  let xml;
+  try {
+    xml = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, { redirect: 'error', signal: AbortSignal.timeout(15000) }).then(r => { if (!r.ok) throw new Error('YouTube feed was unavailable.'); return r.text(); });
+  } catch {
+    return { channelId, ...await moreVideosFor(channelId, 0, execFileImpl) };
+  }
   const entries = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map(([, entry]) => ({
     id: text(entry, 'yt:videoId'), title: text(entry, 'title'), channel: text(entry, 'name'), published: text(entry, 'published')
   })).filter(video => validVideo(video.id));

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
-import { createReaderServer } from '../server.mjs';
+import { createReaderServer, videosFor } from '../server.mjs';
 import { checkRequest } from '../request-security.mjs';
 
 async function readerFor(t) {
@@ -275,6 +275,26 @@ test('a completed provider response cannot start another chunk or retry after di
     await providerAborted;
     assert.equal((await send('/')).status, 200);
     assert.equal(providerCalls, 1);
+    mock.mock.restore();
+  }
+});
+
+test('falls back to the channel video page when YouTube rejects or cannot serve its feed', async t => {
+  const channelId = 'UC1234567890123456789012';
+  for (const failure of ['404', 'network']) {
+    const mock = t.mock.method(globalThis, 'fetch', async () => {
+      if (failure === 'network') throw new Error('Network unavailable');
+      return new Response('', { status: 404 });
+    });
+    const result = await videosFor(channelId, 0, { execFileImpl: async (file, args) => {
+      assert.equal(args.at(-1), `https://www.youtube.com/channel/${channelId}/videos`);
+      assert.equal(args[args.indexOf('--playlist-items') + 1], '1:11');
+      return { stdout: JSON.stringify({ channel: 'Example channel', entries: [{ id: 'abcdefghijk', title: 'Newest video', timestamp: 1700000000 }] }) };
+    } });
+    assert.equal(result.channelId, channelId);
+    assert.equal(result.videos[0].title, 'Newest video');
+    assert.equal(result.videos[0].url, 'https://www.youtube.com/watch?v=abcdefghijk');
+    assert.equal(result.hasMore, false);
     mock.mock.restore();
   }
 });

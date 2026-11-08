@@ -2578,8 +2578,17 @@ dialog label {
 .chatgpt-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.chatgpt-actions .text-action {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  border-radius: var(--radius-button);
+  padding: .5rem .875rem;
 }
 
 #summary-dialog {
