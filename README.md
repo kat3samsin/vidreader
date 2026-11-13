@@ -19,6 +19,10 @@ npm start
 
 Open http://127.0.0.1:4173. `yt-dlp` and its Python dependencies are pinned with hashes in `requirements.txt`. Node supplies its JavaScript runtime.
 
+## Import YouTube subscriptions
+
+Use the **+** button beside **Read video**, then choose **Subscriptions CSV**. Export YouTube subscriptions from [Google Takeout](https://takeout.google.com/settings/takeout/custom/youtube), unzip the archive, and select `subscriptions.csv`. VidReader previews the channel count and skips channels you already follow. Choose **Import subscriptions** to save them in this browser and load their videos. Large imports fetch one channel at a time.
+
 ## Local access
 
 VidReader runs on `127.0.0.1:4173` without a login. It accepts connections from the local machine and rejects network clients. Keep it local because its optional integrations use the server owner's credentials. Host and origin checks remain enabled.

@@ -252,3 +252,127 @@ test('loads the newest page for every channel instead of passing its array index
   assert.deepEqual(offsets, [0, 0, 0]);
   assert.equal(vm.runInContext('channelVideos.length', scope), 3);
 });
+
+test('remembers video size across selections, hiding the player, and reloads', () => {
+  const stored = new Map();
+  const localStorage = { getItem: key => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value) };
+  const node = { classList: { toggle() {} }, setAttribute() {}, scrollIntoView() {} };
+  const scope = vm.createContext({
+    localStorage,
+    document: { querySelector: () => node },
+    matchMedia: () => ({ matches: false }),
+    reader: node,
+    videoControlIcon: () => '',
+    state: () => new Set(), saveState() {}, render() {}, renderReader() {},
+    resetFocusCleanupState() {}, loadTranscript() {}, refreshReader() {},
+  });
+  const initial = app.slice(0, app.indexOf('const list ='));
+  vm.runInContext(initial, scope);
+  vm.runInContext(app.slice(app.indexOf('function toggleVideoSize()'), app.indexOf('function youtubeAPI()')), scope);
+  vm.runInContext(app.slice(app.indexOf('function selectVideo('), app.indexOf('// Re-rendering replaces')), scope);
+  scope.toggleVideoSize();
+  assert.equal(stored.get('watchpaper-video-expanded'), '1');
+  vm.runInContext("videos = [{ id: 'first' }, { id: 'second' }];", scope);
+  scope.selectVideo('first');
+  scope.selectVideo('second');
+  scope.toggleVideoDock();
+  scope.toggleVideoDock();
+  assert.equal(vm.runInContext('videoExpanded', scope), true);
+  const reloaded = vm.createContext({ localStorage });
+  vm.runInContext(initial, reloaded);
+  assert.equal(vm.runInContext('videoExpanded', reloaded), true);
+  scope.toggleVideoSize();
+  assert.equal(stored.get('watchpaper-video-expanded'), '0');
+});
+
+test('imports Takeout subscriptions with quoted names, BOM, duplicates, and canonical channel IDs', () => {
+  const scope = vm.createContext({});
+  vm.runInContext(app.slice(app.indexOf('function parseSubscriptionCsv('), app.indexOf('async function fetchChannel(')), scope);
+  const first = 'UC1234567890123456789012';
+  const second = 'UCabcdefghijklmnopqrstuv';
+  const csv = `\uFEFFChannel Id,Channel Url,Channel Title\r\n${first},https://www.youtube.com/channel/${first},"A channel, with commas"\r\n${second},https://example.com,"A ""quoted""\nname"\r\n${first},ignored,Latest name\r\nnot-a-channel,https://attacker.example,Ignore me\r\n`;
+  assert.deepEqual(JSON.parse(JSON.stringify(scope.parseSubscriptionCsv(csv))), [
+    { source: first, channelId: first, name: 'Latest name' },
+    { source: second, channelId: second, name: 'A "quoted"\nname' },
+  ]);
+  assert.throws(() => scope.parseSubscriptionCsv('Channel Id,Channel Url,Channel Title\n'), /No YouTube channels/);
+  assert.throws(() => scope.parseSubscriptionCsv('"unfinished'), /unfinished quoted field/);
+});
+
+test('subscription import skips followed channels and saves new channels before fetching feeds', async () => {
+  const existing = { source: 'UC1234567890123456789012', channelId: 'UC1234567890123456789012', name: 'Existing' };
+  const added = { source: 'UCabcdefghijklmnopqrstuv', channelId: 'UCabcdefghijklmnopqrstuv', name: 'New' };
+  const nodes = new Map();
+  const node = id => {
+    if (!nodes.has(id)) nodes.set(id, { disabled: false, value: '', textContent: '', classList: { remove() {}, add() {} } });
+    return nodes.get(id);
+  };
+  const events = [];
+  const scope = vm.createContext({
+    document: { querySelector: node },
+    channels: [existing], loadingFeeds: false,
+    channelKey: channel => channel.channelId,
+    saveChannels() { events.push('saved'); },
+    dialog: { close() { events.push('closed'); } },
+    async loadChannels() { events.push('fetch'); },
+  });
+  vm.runInContext(app.slice(app.indexOf('const subscriptionFile ='), app.indexOf("channelInput.addEventListener('input'")), scope);
+  vm.runInContext(`pendingSubscriptions = ${JSON.stringify([existing, added])};`, scope);
+  await node('#import-subscriptions').onclick();
+  assert.equal(scope.channels.length, 2);
+  assert.equal(scope.channels[1].channelId, added.channelId);
+  assert.deepEqual(events, ['saved', 'closed', 'fetch']);
+});
+
+test('finishing a distillation updates the text without rebuilding or stopping the player', async () => {
+  const video = { id: 'abcdefghijk' };
+  const nodes = { '#digest-copy': {}, '#summarize-video': {} };
+  const saved = [];
+  let textUpdates = 0;
+  const scope = vm.createContext({
+    selected: video,
+    transcript: [{ time: '00:01', content: 'A transcript.' }],
+    localStorage: { getItem: () => null },
+    storedApiKey: () => '',
+    document: { querySelector: selector => nodes[selector] },
+    fetch: async () => ({ ok: true, json: async () => ({ summary: 'The finished summary.' }) }),
+    saveDistillation: (id, summary) => saved.push({ id, summary }),
+    renderModeContent() { textUpdates++; },
+    refreshReader() { assert.fail('Finishing a summary must preserve the video player'); },
+  });
+  vm.runInContext(app.slice(app.indexOf('async function summarizeVideo()'), app.indexOf('async function cleanFocusTranscript()')), scope);
+  await scope.summarizeVideo();
+  assert.equal(textUpdates, 1);
+  assert.deepEqual(saved, [{ id: video.id, summary: 'The finished summary.' }]);
+});
+
+test('renders Markdown tables with aligned headers and inline formatting between paragraphs', () => {
+  const html = formatDistillation([
+    'Before the table.',
+    '',
+    '| Event | Check I can attach |',
+    '| :--- | ---: |',
+    '| After a file edit | Run the **linter**. |',
+    '| Before completion | Run `tests`. |',
+    '',
+    'After the table.',
+  ].join('\n'));
+  assert.match(html, /^<p>Before the table\.<\/p><div class="table-scroll"/);
+  assert.match(html, /<th class="table-align-left" scope="col">Event<\/th>/);
+  assert.match(html, /<th class="table-align-right" scope="col">Check I can attach<\/th>/);
+  assert.match(html, /<td class="table-align-right">Run the <strong>linter<\/strong>\.<\/td>/);
+  assert.match(html, /<code>tests<\/code>/);
+  assert.equal((html.match(/<tr>/g) || []).length, 3);
+  assert.match(html, /<\/table><\/div><p>After the table\.<\/p>$/);
+});
+
+test('table cells handle escaped pipes and missing values without rendering untrusted HTML', () => {
+  const html = formatDistillation('Name | Value\n:---: | ---\nA \\| B | <img src=x onerror=alert(1)>\nOnly one |');
+  assert.match(html, /<th class="table-align-center" scope="col">Name<\/th>/);
+  assert.match(html, /A \| B/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(html, /<img\b/);
+  assert.match(html, /<td class="table-align-left"><\/td>/);
+  assert.doesNotMatch(formatDistillation('A | B\nordinary | prose'), /<table>/);
+  assert.doesNotMatch(formatDistillation('```\nA | B\n--- | ---\n```'), /<table>/);
+});

@@ -16,7 +16,7 @@ let videoStart = 0;
 const savedReaderMode = localStorage.getItem('watchpaper-reader-mode');
 let readerMode = ['distill', 'focus', 'raw'].includes(savedReaderMode) ? savedReaderMode : 'focus';
 let videoOpen = localStorage.getItem('watchpaper-video-open') === '1';
-let videoExpanded = false;
+let videoExpanded = localStorage.getItem('watchpaper-video-expanded') === '1';
 let youtubeApiPromise;
 let dockedPlayer;
 let dockedFrame;
@@ -43,7 +43,22 @@ function formatDistillation(value) {
   const closeQuote = () => { if (quote.length) { output += `<blockquote>${inline(quote.join(' '))}</blockquote>`; quote = []; } };
   const closeBlocks = () => { closeParagraph(); closeQuote(); closeList(); };
   const closeCode = () => { output += `<pre class="code"><code>${escape(code.join('\n'))}</code></pre>`; code = []; fence = null; };
-  for (const rawLine of value.split('\n')) {
+  const tableCells = line => {
+    const cells = [];
+    let cell = '';
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '\\' && i + 1 < line.length) { cell += line[i] + line[++i]; continue; }
+      if (line[i] === '|') { cells.push(cell); cell = ''; }
+      else cell += line[i];
+    }
+    cells.push(cell);
+    if (!cells[0].trim()) cells.shift();
+    if (cells.length && !cells.at(-1).trim()) cells.pop();
+    return cells.map(cell => cell.trim().replace(/\\\|/g, '|'));
+  };
+  const lines = value.split('\n');
+  for (let index = 0; index < lines.length; index++) {
+    const rawLine = lines[index];
     const line = rawLine.trim();
     const fenced = line.match(/^(`{3,}|~{3,})\s*([\w+-]*)\s*$/);
     if (fence) {
@@ -53,6 +68,20 @@ function formatDistillation(value) {
     }
     if (fenced) { closeBlocks(); fence = fenced[1]; code = []; continue; }
     if (!line) { closeBlocks(); continue; }
+    const headers = line.includes('|') ? tableCells(line) : [];
+    const separators = tableCells((lines[index + 1] || '').trim());
+    if (headers.length && separators.length === headers.length && separators.every(cell => /^:?-{3,}:?$/.test(cell))) {
+      closeBlocks();
+      const alignments = separators.map(cell => cell.startsWith(':') && cell.endsWith(':') ? 'center' : cell.endsWith(':') ? 'right' : 'left');
+      const cells = (values, tag) => headers.map((_, column) => `<${tag} class="table-align-${alignments[column]}"${tag === 'th' ? ' scope="col"' : ''}>${inline(values[column] || '')}</${tag}>`).join('');
+      output += `<div class="table-scroll" role="region" aria-label="Summary table" tabindex="0"><table><thead><tr>${cells(headers, 'th')}</tr></thead><tbody>`;
+      index++;
+      while (index + 1 < lines.length && lines[index + 1].trim().includes('|')) {
+        output += `<tr>${cells(tableCells(lines[++index].trim()), 'td')}</tr>`;
+      }
+      output += '</tbody></table></div>';
+      continue;
+    }
     if (/^([-*_])\s*(\1\s*){2,}$/.test(line)) { closeBlocks(); output += '<hr />'; continue; }
     const heading = line.match(/^#{1,6}\s+(.+?)\s*$/) || line.match(/^\*\*(.+?)\*\*:?$/);
     const ordered = line.match(/^\d+[.)]\s+(.+)$/);
@@ -153,6 +182,37 @@ function storedDirectVideos() {
   return JSON.parse(localStorage.getItem('watchpaper-direct-videos') || '[]').filter(isYouTubeVideo);
 }
 
+function parseSubscriptionCsv(input) {
+  const rows = [];
+  let row = [], value = '', quoted = false;
+  const source = input.replace(/^\uFEFF/, '');
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (char === '"') {
+      if (quoted && source[i + 1] === '"') { value += '"'; i++; }
+      else quoted = !quoted;
+    } else if (!quoted && (char === ',' || char === '\n' || char === '\r')) {
+      row.push(value);
+      value = '';
+      if (char !== ',') {
+        rows.push(row);
+        row = [];
+        if (char === '\r' && source[i + 1] === '\n') i++;
+      }
+    } else value += char;
+  }
+  if (quoted) throw new Error('This CSV has an unfinished quoted field. Export subscriptions.csv again.');
+  if (value || row.length) { row.push(value); rows.push(row); }
+  const channels = new Map();
+  for (const fields of rows) {
+    const id = fields[0]?.trim();
+    if (!/^UC[\w-]{22}$/.test(id || '')) continue;
+    channels.set(id, { source: id, channelId: id, name: fields[2]?.trim() || id });
+  }
+  if (!channels.size) throw new Error('No YouTube channels found. Choose subscriptions.csv from your Google Takeout export.');
+  return [...channels.values()];
+}
+
 async function fetchChannel(channel, offset = 0) {
   const response = await fetch(`/api/channel?source=${encodeURIComponent(channel.source)}${offset ? `&offset=${offset}` : ''}`);
   const payload = await response.json();
@@ -183,7 +243,12 @@ async function loadChannels() {
   }
   loadingFeeds = true;
   render();
-  const results = await Promise.allSettled(channels.map(channel => fetchChannel(channel)));
+  const results = [];
+  // Fetch one feed at a time so a large subscription import stays within API capacity.
+  for (const channel of channels) {
+    try { results.push({ status: 'fulfilled', value: await fetchChannel(channel) }); }
+    catch (reason) { results.push({ status: 'rejected', reason }); }
+  }
   loadingFeeds = false;
   channelVideos = results.flatMap((result, index) => {
     if (result.status === 'fulfilled') return result.value;
@@ -462,6 +527,7 @@ function setReaderMode(mode) {
 
 function toggleVideoSize() {
   videoExpanded = !videoExpanded;
+  localStorage.setItem('watchpaper-video-expanded', videoExpanded ? '1' : '0');
   document.querySelector('.reader-content').classList.toggle('is-video-expanded', videoExpanded);
   const button = document.querySelector('#resize-video');
   button.innerHTML = videoControlIcon(videoExpanded ? 'shrink' : 'expand');
@@ -472,7 +538,7 @@ function toggleVideoSize() {
 
 function toggleVideoDock() {
   videoOpen = !videoOpen;
-  if (!videoOpen) { videoStart = 0; videoExpanded = false; }
+  if (!videoOpen) videoStart = 0;
   localStorage.setItem('watchpaper-video-open', videoOpen ? '1' : '0');
   refreshReader();
 }
@@ -608,7 +674,6 @@ function selectVideo(id, scroll = true) {
     return;
   }
   selected = videos.find(video => video.id === id);
-  videoExpanded = false;
   transcript = [];
   transcriptState = 'idle';
   transcriptError = '';
@@ -961,7 +1026,7 @@ async function summarizeVideo() {
     if (!response.ok) throw new Error(payload.error);
     saveDistillation(video.id, payload.summary);
     if (selected?.id !== video.id) return;
-    refreshReader();
+    renderModeContent();
   } catch (error) {
     if (selected?.id !== video.id) return;
     const currentSummary = document.querySelector('#digest-copy');
@@ -1117,6 +1182,45 @@ dialog.querySelector('form').addEventListener('submit', async event => {
   submit.removeAttribute('aria-busy');
   submit.textContent = 'Add channel';
 });
+const subscriptionFile = document.querySelector('#subscriptions-file');
+const subscriptionImport = document.querySelector('#import-subscriptions');
+const subscriptionStatus = document.querySelector('#subscriptions-status');
+let pendingSubscriptions = [];
+subscriptionFile.onchange = async () => {
+  pendingSubscriptions = [];
+  subscriptionImport.disabled = true;
+  subscriptionStatus.classList.remove('is-error');
+  const file = subscriptionFile.files[0];
+  if (!file) { subscriptionStatus.textContent = ''; return; }
+  try {
+    if (file.size > 2_000_000) throw new Error('Choose the subscriptions CSV, up to 2 MB, rather than the full Takeout archive.');
+    pendingSubscriptions = parseSubscriptionCsv(await file.text());
+    const existing = pendingSubscriptions.filter(channel => channels.some(entry => channelKey(entry) === channel.channelId)).length;
+    subscriptionStatus.textContent = `${pendingSubscriptions.length} channels found. ${existing} already followed.`;
+    subscriptionImport.disabled = existing === pendingSubscriptions.length;
+  } catch (error) {
+    subscriptionStatus.textContent = error.message;
+    subscriptionStatus.classList.add('is-error');
+  }
+};
+subscriptionImport.onclick = async () => {
+  if (loadingFeeds) {
+    subscriptionStatus.textContent = 'Wait for the current channels to finish loading, then import.';
+    return;
+  }
+  const added = pendingSubscriptions.filter(channel => !channels.some(entry => channelKey(entry) === channel.channelId));
+  if (!added.length) return;
+  channels.push(...added);
+  saveChannels();
+  pendingSubscriptions = [];
+  subscriptionFile.value = '';
+  subscriptionImport.disabled = true;
+  subscriptionStatus.textContent = '';
+  activeChannel = 'all';
+  dialog.close();
+  await loadChannels();
+};
+
 channelInput.addEventListener('input', () => {
   if (!channelInput.hasAttribute('aria-invalid')) return;
   channelInput.removeAttribute('aria-invalid');

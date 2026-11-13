@@ -3234,3 +3234,60 @@ body.is-reading .link-row {
     overflow-y: visible;
   }
 }
+
+.subscription-import {
+  margin-top: var(--space-lg);
+  border-top: var(--rule-hair) solid var(--color-rule);
+  padding-top: var(--space-md);
+}
+
+.subscription-import h3 {
+  margin-top: 0;
+}
+
+.subscription-import input[type="file"] {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+}
+
+.subscription-import .chip {
+  margin-top: var(--space-sm);
+}
+
+.digest-copy .table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-block: var(--space-md);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-control);
+}
+
+.digest-copy table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .9em;
+  line-height: 1.5;
+}
+
+.digest-copy th,
+.digest-copy td {
+  min-width: 8rem;
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+  padding: .625rem .875rem;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.digest-copy th {
+  background: var(--color-paper-2);
+  font-weight: 700;
+}
+
+.digest-copy tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.digest-copy .table-align-left { text-align: left; }
+.digest-copy .table-align-center { text-align: center; }
+.digest-copy .table-align-right { text-align: right; }

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400..700;1,400..600&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./reader.css?v=reader-mobile-queue-20261107" />
+    <link rel="stylesheet" href="./reader.css?v=reader-tables-20261112" />
     <script src="./preferences-init.js"></script>
   </head>
   <body>
@@ -86,6 +86,13 @@
         <label>Channel URL or @handle<input id="channel-url" aria-describedby="channel-helper" aria-required="true" placeholder="youtube.com/@creator" required /></label>
         <p class="helper" id="channel-helper" data-default="VidReader reads the channel’s public feed and pulls English captions when they exist.">VidReader reads the channel’s public feed and pulls English captions when they exist.</p>
         <button class="chip chip-primary submit" value="default">Add channel</button>
+        <section class="subscription-import" aria-labelledby="subscription-import-title">
+          <h3 id="subscription-import-title">Import YouTube subscriptions</h3>
+          <p class="helper">Export subscriptions from <a href="https://takeout.google.com/settings/takeout/custom/youtube" target="_blank" rel="noreferrer">Google Takeout</a>, unzip the download, then choose subscriptions.csv.</p>
+          <label>Subscriptions CSV<input id="subscriptions-file" type="file" accept=".csv,text/csv" aria-describedby="subscriptions-status" /></label>
+          <p id="subscriptions-status" class="helper" role="status"></p>
+          <button id="import-subscriptions" class="chip" type="button" disabled>Import subscriptions</button>
+        </section>
       </form>
     </dialog>
     <dialog id="summary-dialog" aria-labelledby="summary-dialog-title" aria-describedby="summary-dialog-description">
@@ -162,6 +169,6 @@
       </form>
     </dialog>
     <div class="toast-region" id="toast-region" aria-live="polite" hidden></div>
-    <script src="./app.js?v=reader-mobile-queue-20261107"></script>
+    <script src="./app.js?v=reader-tables-20261112"></script>
   </body>
 </html>
