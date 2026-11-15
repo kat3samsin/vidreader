@@ -3291,3 +3291,81 @@ body.is-reading .link-row {
 .digest-copy .table-align-left { text-align: left; }
 .digest-copy .table-align-center { text-align: center; }
 .digest-copy .table-align-right { text-align: right; }
+
+/* Expanded playback leads the page; details and reading controls follow it. */
+.reader:has(> .reader-content.is-video-expanded > .video-dock) {
+  grid-template-rows: minmax(0, 45%) auto minmax(0, 1fr);
+  row-gap: var(--space-lg);
+}
+
+.reader:has(> .reader-content.is-video-expanded > .video-dock) > .reader-head {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.reader-content.is-video-expanded:has(> .video-dock) {
+  display: contents;
+}
+
+.reader-content.is-video-expanded > .video-dock {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.reader:has(> .reader-content.is-video-expanded > .video-dock) .reader-copy {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+@media (max-width: 59.999rem) {
+  .reader:has(> .reader-content.is-video-expanded > .video-dock) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .reader:has(> .reader-content.is-video-expanded > .video-dock) > .reader-head {
+    order: 1;
+    width: 100%;
+  }
+
+  .reader-content.is-video-expanded > .video-dock {
+    order: 0;
+  }
+}
+
+@media (min-width: 60rem) {
+  .app-main:has(.reader-content.is-video-expanded > .video-dock) {
+    grid-template-rows: minmax(0, 60%) auto minmax(0, 1fr);
+    row-gap: var(--space-lg);
+    padding-block: var(--space-lg);
+  }
+
+  .app-main:has(.reader-content.is-video-expanded > .video-dock) .reader {
+    display: contents;
+  }
+
+  .app-main:has(.reader-content.is-video-expanded > .video-dock) .video-dock {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: auto;
+    margin-inline: var(--page-gutter);
+  }
+
+  .app-main:has(.reader-content.is-video-expanded > .video-dock) .queue-pane {
+    grid-row: 2 / 4;
+    padding-block: 0;
+  }
+
+  .app-main:has(.reader-content.is-video-expanded > .video-dock) .reader-head {
+    grid-column: 2;
+    grid-row: 2;
+    margin-inline: var(--space-xl) var(--page-gutter);
+  }
+
+  .app-main:has(.reader-content.is-video-expanded > .video-dock) .reader-copy {
+    grid-column: 2;
+    grid-row: 3;
+    margin-inline: var(--space-xl) var(--page-gutter);
+  }
+}
